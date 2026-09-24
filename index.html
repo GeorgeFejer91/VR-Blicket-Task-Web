@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#24221e">
+    <title>Blicket Task</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div>
+          <h1>Blicket Task</h1>
+          <p class="subtitle">A small 3D causal discovery game</p>
+        </div>
+        <div class="topbar-right">
+          <span id="progress" aria-live="polite">Ready to begin</span>
+          <button id="restart" class="quiet" type="button" hidden>Restart</button>
+        </div>
+      </header>
+
+      <main>
+        <section class="instructions" aria-live="polite">
+          <h2 id="prompt">Find out which object makes the detector go.</h2>
+          <p id="detail">Put each object on the detector, watch what happens, then make your choices.</p>
+        </section>
+
+        <div id="scene" class="scene" role="img" aria-label="Interactive 3D Blicket detector and objects"></div>
+
+        <div class="footer-row">
+          <span id="feedback" role="status">Click Begin to start.</span>
+          <div class="actions">
+            <button id="begin" type="button" disabled>Loading 3D scene…</button>
+            <button id="next" type="button" hidden>Next object</button>
+            <button id="download" type="button" hidden>Download session JSON</button>
+          </div>
+        </div>
+      </main>
+    </div>
+    <script type="module" src="./game.js"></script>
+  </body>
+</html>

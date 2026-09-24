@@ -1,0 +1,92 @@
+{
+  "schema": "vr-blicket-scenario.v1",
+  "scenarioId": "v1_hidden_object_types",
+  "title": "Hidden Object Types",
+  "protocolFamily": "single-object deterministic evidence",
+  "ruleType": "deterministic_hidden_object",
+  "participantRole": "active tester",
+  "instructions": "Buckets arrive one at a time. Test each object on the blicket detector platform, then point to the blicket and answer about each final object.",
+  "objects": [
+    {
+      "id": "obj_red_cube",
+      "label": "Red cube",
+      "visible": { "shape": "cube", "color": "#D4433E", "material": "matte" },
+      "hiddenBlicket": true
+    },
+    {
+      "id": "obj_blue_column",
+      "label": "Blue column",
+      "visible": { "shape": "column", "color": "#2F6FDB", "material": "matte" },
+      "hiddenBlicket": false
+    },
+    {
+      "id": "obj_green_block",
+      "label": "Green block",
+      "visible": { "shape": "block", "color": "#31A861", "material": "matte" },
+      "hiddenBlicket": false
+    }
+  ],
+  "buckets": [
+    { "id": "bucket_1", "label": "Bucket 1", "arrivalOrder": 1, "objectId": "obj_red_cube" },
+    { "id": "bucket_2", "label": "Bucket 2", "arrivalOrder": 2, "objectId": "obj_blue_column" },
+    { "id": "bucket_3", "label": "Bucket 3", "arrivalOrder": 3, "objectId": "obj_green_block" }
+  ],
+  "trialOrder": [
+    {
+      "trialId": "trial_1",
+      "order": 1,
+      "bucketId": "bucket_1",
+      "objectId": "obj_red_cube",
+      "participantAction": "drag_object_to_platform",
+      "prompt": "Test the object from Bucket 1."
+    },
+    {
+      "trialId": "trial_2",
+      "order": 2,
+      "bucketId": "bucket_2",
+      "objectId": "obj_blue_column",
+      "participantAction": "drag_object_to_platform",
+      "prompt": "Test the object from Bucket 2."
+    },
+    {
+      "trialId": "trial_3",
+      "order": 3,
+      "bucketId": "bucket_3",
+      "objectId": "obj_green_block",
+      "participantAction": "drag_object_to_platform",
+      "prompt": "Test the object from Bucket 3."
+    }
+  ],
+  "detector": {
+    "platformDropMeters": 0.035,
+    "checkDurationMs": 900,
+    "activationDurationMs": 1200,
+    "activeCue": "blink_and_chime",
+    "inactiveCue": "platform_only"
+  },
+  "finalPrompt": {
+    "prompt": "Point to the object you think is the blicket.",
+    "pointPrompt": "Point to the object you think is the blicket.",
+    "sequentialPrompt": "Is this object a blicket?",
+    "choices": ["blicket", "not_blicket"],
+    "pointObjectIds": ["obj_red_cube", "obj_blue_column", "obj_green_block"],
+    "sequentialObjectIds": ["obj_red_cube", "obj_blue_column", "obj_green_block"]
+  },
+  "sourceCitations": [
+    {
+      "id": "gopnik_sobel_2000",
+      "title": "Detecting blickets: How young children use information about novel causal powers in categorization and induction",
+      "url": "https://doi.org/10.1111/1467-8624.00224"
+    },
+    {
+      "id": "gopnik_et_al_2001",
+      "title": "Causal learning mechanisms in very young children: Two-, three-, and four-year-olds infer causal relations from patterns of variation and covariation",
+      "url": "https://www.cmu.edu/dietrich/philosophy/docs/glymour/GopnikEtAl2001-LearningInKids.pdf"
+    },
+    {
+      "id": "kosoy_et_al_2022",
+      "title": "Young children are the best learners for causal overhypotheses",
+      "url": "https://proceedings.mlr.press/v177/kosoy22a.html"
+    }
+  ]
+}
