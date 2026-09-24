@@ -1,13 +1,18 @@
 import * as THREE from './vendor/three.module.min.js';
+import { stepBucketBodies } from './bucket-physics.mjs';
 
 const ui = Object.fromEntries(
   ['scene', 'prompt', 'detail', 'progress', 'feedback', 'begin', 'next', 'download', 'restart']
     .map((id) => [id, document.getElementById(id)]),
 );
 
-const START = new THREE.Vector3(-2.25, 1.08, 0.2);
+const BUCKET_HOME = new THREE.Vector3(-2.25, 0, 0.2);
+const START = new THREE.Vector3(-2.25, 1.55, 0.2);
 const DETECTOR = new THREE.Vector3(1.55, 0, -0.45);
 const PLATFORM_TOP = 0.96;
+const BUCKET_ENTRY_X = -6.6;
+const ARRIVAL_SECONDS = 1.8;
+const LIFT_SECONDS = 0.55;
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -PLATFORM_TOP);
@@ -35,6 +40,12 @@ let session;
 let pointerHeld = false;
 let draggedObject = false;
 let lastFrame = 0;
+let arrivalElapsed = 0;
+let liftElapsed = 0;
+let liftFrom;
+let bucketBodies = [];
+let outcomeActivated = null;
+let outcomeAt = 0;
 
 boot().catch((error) => {
   ui.prompt.textContent = 'The game could not load.';
@@ -48,8 +59,9 @@ async function boot() {
   const response = await fetch('./scenario.json');
   if (!response.ok) throw new Error(`Scenario request failed: ${response.status}`);
   scenario = await response.json();
-  if (scenario.ruleType !== 'deterministic_hidden_object' || scenario.trialOrder.length !== 3) {
-    throw new Error('This game needs the three-trial deterministic scenario.');
+  if (scenario.ruleType !== 'deterministic_hidden_object' || scenario.trialOrder.length !== 3 ||
+      scenario.buckets.length !== 1 || scenario.buckets[0].objectIds.length !== 3) {
+    throw new Error('This game needs one bucket with three deterministic trial objects.');
   }
 
   buildScene();
@@ -128,23 +140,23 @@ function buildScene() {
   scene.add(machine);
 
   bucket = new THREE.Group();
-  bucket.position.set(START.x, 0, START.z);
+  bucket.position.copy(BUCKET_HOME);
   const pail = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.64, 0.5, 0.52, 32, 1, true),
+    new THREE.CylinderGeometry(1.4, 1.26, 0.52, 40, 1, true),
     new THREE.MeshStandardMaterial({ color: '#928273', side: THREE.DoubleSide, roughness: 0.9 }),
   );
-  pail.position.y = 0.28;
+  pail.position.y = 0.29;
   pail.castShadow = true;
   bucket.add(pail);
   const rim = new THREE.Mesh(
-    new THREE.TorusGeometry(0.64, 0.065, 8, 32),
+    new THREE.TorusGeometry(1.4, 0.07, 8, 40),
     new THREE.MeshStandardMaterial({ color: '#5c544a', roughness: 0.8 }),
   );
   rim.rotation.x = Math.PI / 2;
-  rim.position.y = 0.55;
+  rim.position.y = 0.56;
   bucket.add(rim);
   const bottom = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.5, 0.5, 0.04, 32),
+    new THREE.CylinderGeometry(1.26, 1.26, 0.04, 40),
     new THREE.MeshStandardMaterial({ color: '#6a5e52', roughness: 0.8 }),
   );
   bottom.position.y = 0.035;
@@ -154,6 +166,7 @@ function buildScene() {
   for (const spec of scenario.objects) {
     const mesh = makeObject(spec);
     mesh.userData.objectId = spec.id;
+    mesh.userData.bucketRadius = { cube: 0.44, column: 0.38, block: 0.53 }[spec.visible.shape];
     mesh.visible = false;
     objects.set(spec.id, mesh);
     pickMeshes.push(mesh);
@@ -237,10 +250,13 @@ function choicePad(action, x, color, text) {
 function renderIntro() {
   stage = 'intro';
   machine.visible = true;
+  machine.position.y = 0;
   bucket.visible = true;
+  bucket.position.copy(BUCKET_HOME);
+  bucket.rotation.set(0, 0, 0);
   choicePads.visible = false;
   for (const object of objects.values()) object.visible = false;
-  setDetector(false);
+  setDetector(null);
   ui.progress.textContent = 'Ready to begin';
   ui.prompt.textContent = 'Find out which object makes the detector go.';
   ui.detail.textContent = 'Put each object on the 3D detector, watch what happens, then make your choices.';
@@ -270,42 +286,86 @@ function start() {
   ui.begin.hidden = true;
   ui.restart.hidden = false;
   ui.download.hidden = true;
-  showTrial();
+  ui.next.hidden = true;
+  machine.visible = true;
+  machine.position.y = 0;
+  bucket.visible = true;
+  bucket.position.set(BUCKET_ENTRY_X, 0, BUCKET_HOME.z);
+  bucket.rotation.set(0, 0, 0);
+  choicePads.visible = false;
+  platform.position.y = 0.87;
+  setDetector(null);
+  currentObject = null;
+  bucketBodies = [];
+  const positions = [[-0.58, -0.3], [0.57, -0.3], [0, 0.68]];
+  scenario.buckets[0].objectIds.forEach((id, index) => {
+    const mesh = objects.get(id);
+    if (!mesh) throw new Error(`Missing bucket object ${id}`);
+    bucket.add(mesh);
+    mesh.visible = true;
+    mesh.rotation.set(0, 0, 0);
+    const [x, z] = positions[index];
+    const radius = mesh.userData.bucketRadius;
+    bucketBodies.push({ id, mesh, x, z, vx: 0, vz: 0, radius });
+    mesh.position.set(x, 0.065 + objectHalfHeight(mesh), z);
+  });
+  arrivalElapsed = 0;
+  stage = 'arrival';
+  ui.progress.textContent = 'Bucket arriving';
+  ui.prompt.textContent = 'Watch the bucket come onto the table.';
+  ui.detail.textContent = 'Three objects are moving inside it.';
+  ui.feedback.textContent = 'The objects are rattling together.';
+  log('bucket_arrival_started', { bucketId: scenario.buckets[0].id, objectIds: scenario.buckets[0].objectIds });
 }
 
 function showTrial() {
   const trial = scenario.trialOrder[trialIndex];
   const spec = scenario.objects.find((object) => object.id === trial.objectId);
   if (!spec) throw new Error(`Missing object ${trial.objectId}`);
-  stage = 'ready';
+  stage = 'presenting';
   currentObject = objects.get(spec.id);
-  for (const object of objects.values()) object.visible = object === currentObject;
-  currentObject.position.copy(START);
+  bucketBodies = bucketBodies.filter((body) => body.id !== spec.id);
+  scene.attach(currentObject);
+  liftFrom = currentObject.position.clone();
+  liftElapsed = 0;
   currentObject.rotation.set(0, 0, 0);
   bucket.visible = true;
   machine.visible = true;
   choicePads.visible = false;
-  platform.position.y = 0.87;
-  setDetector(false);
+  setDetector(null);
   ui.progress.textContent = `Object ${trialIndex + 1} of ${scenario.trialOrder.length}`;
+  ui.prompt.textContent = `Here is the ${spec.label.toLowerCase()}.`;
+  ui.detail.textContent = 'Watch it come out of the bucket.';
+  ui.feedback.textContent = 'Getting the object ready.';
+  ui.next.hidden = true;
+}
+
+function readyTrial() {
+  const trial = activeTrial();
+  const spec = scenario.objects.find((object) => object.id === trial.objectId);
+  stage = 'ready';
   ui.prompt.textContent = `Put the ${spec.label.toLowerCase()} on the blicket detector.`;
   ui.detail.textContent = 'Drag the 3D object onto the platform, or click the object and then click the platform.';
   ui.feedback.textContent = `${spec.label} is ready to test.`;
-  ui.next.hidden = true;
   log('trial_started', { trialId: trial.trialId, objectId: spec.id });
 }
 
-function setDetector(active) {
+function setDetector(outcome, lit = true) {
   if (!lamp) return;
-  lamp.material.color.set(active ? '#efae43' : '#55534c');
-  lamp.material.emissive.set(active ? '#df6715' : '#000000');
-  lamp.material.emissiveIntensity = active ? 1.4 : 0;
+  const visible = outcome !== null && lit;
+  const signal = outcome ? '#efae43' : '#cf6050';
+  const glow = outcome ? '#df6715' : '#aa2720';
+  lamp.material.color.set(visible ? signal : '#55534c');
+  lamp.material.emissive.set(visible ? glow : '#000000');
+  lamp.material.emissiveIntensity = visible ? 1.4 : 0;
   for (const light of [leftLight, rightLight]) {
-    light.material.color.set(active ? '#eaaa45' : '#656059');
-    light.material.emissive.set(active ? '#a74510' : '#000000');
-    light.material.emissiveIntensity = active ? 0.7 : 0;
+    light.material.color.set(visible ? signal : '#656059');
+    light.material.emissive.set(visible ? glow : '#000000');
+    light.material.emissiveIntensity = visible ? 0.7 : 0;
   }
-  platform.material.color.set(active ? '#e5b86c' : '#d0c2aa');
+  platform.material.color.set(visible ? signal : '#d0c2aa');
+  platform.material.emissive.set(visible ? glow : '#000000');
+  platform.material.emissiveIntensity = visible ? 0.7 : 0;
 }
 
 function onPointerDown(event) {
@@ -357,7 +417,7 @@ function onPointerUp(event) {
     renderer.domElement.releasePointerCapture(event.pointerId);
   }
   if (stage !== 'held') return;
-  if (draggedObject && pointOnPlane(event) && overPlatform(dropPoint)) {
+  if (draggedObject && pointOnPlane(event) && overPlatform(dropPoint, currentObject)) {
     placeObject();
   } else {
     currentObject.position.copy(START);
@@ -400,8 +460,16 @@ function pointOnPlane(event) {
   return raycaster.ray.intersectPlane(dragPlane, dropPoint) !== null;
 }
 
-function overPlatform(point) {
-  return Math.abs(point.x - DETECTOR.x) <= 0.97 && Math.abs(point.z - DETECTOR.z) <= 0.67;
+function overPlatform(point, mesh) {
+  mesh.geometry.computeBoundingBox();
+  const bounds = mesh.geometry.boundingBox;
+  const halfX = (bounds.max.x - bounds.min.x) / 2;
+  const halfZ = (bounds.max.z - bounds.min.z) / 2;
+  const overlapX = Math.max(0,
+    Math.min(point.x + halfX, DETECTOR.x + 0.935) - Math.max(point.x - halfX, DETECTOR.x - 0.935));
+  const overlapZ = Math.max(0,
+    Math.min(point.z + halfZ, DETECTOR.z + 0.64) - Math.max(point.z - halfZ, DETECTOR.z - 0.64));
+  return overlapX >= halfX && overlapZ >= halfZ;
 }
 
 function objectHalfHeight(mesh) {
@@ -416,6 +484,8 @@ function placeObject() {
   const trial = activeTrial();
   stage = 'checking';
   pointerHeld = false;
+  outcomeActivated = null;
+  setDetector(null);
   currentObject.position.set(DETECTOR.x, PLATFORM_TOP + objectHalfHeight(currentObject), DETECTOR.z);
   ui.prompt.textContent = 'The detector is checking the object…';
   ui.detail.textContent = 'Watch the platform and light.';
@@ -434,6 +504,8 @@ function showOutcome() {
   const spec = scenario.objects.find((object) => object.id === trial.objectId);
   const activated = spec.hiddenBlicket === true;
   stage = 'outcome';
+  outcomeActivated = activated;
+  outcomeAt = performance.now();
   setDetector(activated);
   ui.prompt.textContent = activated ? 'The machine went!' : 'The machine stayed off.';
   ui.detail.textContent = activated
@@ -448,6 +520,7 @@ function showOutcome() {
 
 function advance() {
   if (stage !== 'outcome') return;
+  currentObject.visible = false;
   trialIndex += 1;
   if (trialIndex < scenario.trialOrder.length) showTrial();
   else showPointChoice();
@@ -512,7 +585,7 @@ function complete() {
   for (const object of objects.values()) object.visible = false;
   machine.visible = true;
   bucket.visible = false;
-  setDetector(false);
+  setDetector(null);
   session.completedAt = new Date().toISOString();
   log('session_completed', {});
   ui.progress.textContent = 'Complete';
@@ -550,10 +623,52 @@ function resize() {
 function animate(time) {
   const delta = Math.min((time - lastFrame) / 1000 || 0, 0.05);
   lastFrame = time;
-  const targetY = stage === 'checking' || stage === 'outcome' ? 0.76 : 0.87;
+
+  if (bucket.visible && bucketBodies.length) {
+    stepBucketBodies(bucketBodies, delta, stage === 'arrival' ? 7 : 0, time / 1000);
+    bucketBodies.forEach((body, index) => {
+      const bounce = stage === 'arrival' ? Math.abs(Math.sin(time * 0.027 + index * 2)) * 0.07 : 0;
+      body.mesh.position.set(body.x, 0.065 + objectHalfHeight(body.mesh) + bounce, body.z);
+    });
+  }
+
+  if (stage === 'arrival') {
+    arrivalElapsed += delta;
+    const progress = Math.min(arrivalElapsed / ARRIVAL_SECONDS, 1);
+    const eased = 1 - (1 - progress) ** 3;
+    bucket.position.x = BUCKET_ENTRY_X + (BUCKET_HOME.x - BUCKET_ENTRY_X) * eased;
+    bucket.rotation.z = Math.sin(time * 0.023) * 0.035 * (1 - progress);
+    bucket.rotation.x = Math.sin(time * 0.018) * 0.018 * (1 - progress);
+    if (progress === 1) {
+      bucket.position.copy(BUCKET_HOME);
+      bucket.rotation.set(0, 0, 0);
+      log('bucket_arrived', { bucketId: scenario.buckets[0].id });
+      showTrial();
+    }
+  }
+
+  if (stage === 'presenting') {
+    liftElapsed += delta;
+    const progress = Math.min(liftElapsed / LIFT_SECONDS, 1);
+    const eased = 1 - (1 - progress) ** 3;
+    currentObject.position.lerpVectors(liftFrom, START, eased);
+    if (progress === 1) readyTrial();
+  }
+
+  const machineTargetY = stage === 'checking' || stage === 'outcome'
+    ? -scenario.detector.machineDropMeters : 0;
+  machine.position.y = THREE.MathUtils.damp(machine.position.y, machineTargetY, 9, delta);
+  const targetY = stage === 'checking' || stage === 'outcome'
+    ? 0.87 - scenario.detector.platformDropMeters : 0.87;
   platform.position.y = THREE.MathUtils.damp(platform.position.y, targetY, 9, delta);
   if (currentObject && (stage === 'checking' || stage === 'outcome')) {
-    currentObject.position.y = platform.position.y + 0.09 + objectHalfHeight(currentObject);
+    currentObject.position.y = machine.position.y + platform.position.y + 0.09 + objectHalfHeight(currentObject);
+  }
+  if (stage === 'outcome') {
+    const elapsed = time - outcomeAt;
+    const pulseOn = elapsed >= Math.max(scenario.detector.activationDurationMs, 1400) ||
+      Math.floor(elapsed / 170) % 2 === 0;
+    setDetector(outcomeActivated, pulseOn);
   }
   renderer.render(scene, camera);
 }

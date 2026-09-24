@@ -1,11 +1,11 @@
 {
-  "schema": "vr-blicket-scenario.v1",
+  "schema": "vr-blicket-web-scenario.v1",
   "scenarioId": "v1_hidden_object_types",
   "title": "Hidden Object Types",
   "protocolFamily": "single-object deterministic evidence",
   "ruleType": "deterministic_hidden_object",
   "participantRole": "active tester",
-  "instructions": "Buckets arrive one at a time. Test each object on the blicket detector platform, then point to the blicket and answer about each final object.",
+  "instructions": "One bucket carrying three objects arrives. Test each object on the blicket detector platform, then point to the blicket and answer about each final object.",
   "objects": [
     {
       "id": "obj_red_cube",
@@ -27,42 +27,41 @@
     }
   ],
   "buckets": [
-    { "id": "bucket_1", "label": "Bucket 1", "arrivalOrder": 1, "objectId": "obj_red_cube" },
-    { "id": "bucket_2", "label": "Bucket 2", "arrivalOrder": 2, "objectId": "obj_blue_column" },
-    { "id": "bucket_3", "label": "Bucket 3", "arrivalOrder": 3, "objectId": "obj_green_block" }
+    { "id": "shared_bucket", "label": "Object bucket", "arrivalOrder": 1, "objectIds": ["obj_red_cube", "obj_blue_column", "obj_green_block"] }
   ],
   "trialOrder": [
     {
       "trialId": "trial_1",
       "order": 1,
-      "bucketId": "bucket_1",
+      "bucketId": "shared_bucket",
       "objectId": "obj_red_cube",
       "participantAction": "drag_object_to_platform",
-      "prompt": "Test the object from Bucket 1."
+      "prompt": "Test the red cube from the bucket."
     },
     {
       "trialId": "trial_2",
       "order": 2,
-      "bucketId": "bucket_2",
+      "bucketId": "shared_bucket",
       "objectId": "obj_blue_column",
       "participantAction": "drag_object_to_platform",
-      "prompt": "Test the object from Bucket 2."
+      "prompt": "Test the blue column from the bucket."
     },
     {
       "trialId": "trial_3",
       "order": 3,
-      "bucketId": "bucket_3",
+      "bucketId": "shared_bucket",
       "objectId": "obj_green_block",
       "participantAction": "drag_object_to_platform",
-      "prompt": "Test the object from Bucket 3."
+      "prompt": "Test the green block from the bucket."
     }
   ],
   "detector": {
-    "platformDropMeters": 0.035,
+    "platformDropMeters": 0.11,
+    "machineDropMeters": 0.055,
     "checkDurationMs": 900,
-    "activationDurationMs": 1200,
-    "activeCue": "blink_and_chime",
-    "inactiveCue": "platform_only"
+    "activationDurationMs": 1400,
+    "activeCue": "gold_platform_blink",
+    "inactiveCue": "red_platform_blink"
   },
   "finalPrompt": {
     "prompt": "Point to the object you think is the blicket.",

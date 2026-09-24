@@ -1,6 +1,6 @@
 # Blicket Task PC game
 
-A static 3D browser game hosted on GitHub Pages. Put each object on the detector, watch whether it activates, then make your choices.
+A static 3D browser game hosted on GitHub Pages. A bucket carries three colliding objects onto the table. Put each one on the detector, watch the machine press down and blink its result, then make your choices.
 
 Play at [georgefejer91.github.io/VR-Blicket-Task-Web](https://georgefejer91.github.io/VR-Blicket-Task-Web/).
 
