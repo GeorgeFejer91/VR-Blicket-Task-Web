@@ -13,7 +13,7 @@ Use installed Node/Python or the Codex bundled runtime if absent from PATH. HTTP
 
 ## Detector, sound and automatic-download release
 
-2026-09-27 release candidate: syntax, all three Node tests, and the public context check VERIFIED. The public copy completed the full desktop browser flow with click/drag placement, a missed drop, both outcomes, mute and persistent tabletop objects through every judgment/completion. Console warnings/errors were empty. Earlier local source validation saved and parsed the automatically downloaded JSON, confirming three trials, point choice, three judgments, three table-return events and one final completion event. The later public-candidate disk download was BLOCKED by a full local C: drive; this is separate from the passing serialized Blob regression. Hosted publication and disk receipt must be checked after release.
+2026-09-27 release `669869a`: VERIFIED. Syntax, all three Node tests, and context/remote checks pass; the matching Pages build succeeded. Both the public local copy and hosted game completed the full desktop flow with click/drag placement, a missed drop, both outcomes, mute, persistent tabletop objects through every judgment/completion, and restart. Console warnings/errors were empty. The hosted final answer automatically saved a JSON file at 13:51:47 UTC; the parsed file contains the gray scenario ID, all three trials, point choice, three judgments, three table-return events, `completedAt` and one final `session_completed` event. No download button is rendered. A transient full C: drive prevented an earlier candidate download; disk space recovered and the hosted receipt supersedes that blocked attempt. Test exports and screenshots remain local and are not published.
 
 ## Evidence limits
 
