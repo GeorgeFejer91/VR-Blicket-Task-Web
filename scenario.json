@@ -1,58 +1,58 @@
 {
   "schema": "vr-blicket-web-scenario.v1",
-  "scenarioId": "v1_hidden_object_types",
+  "scenarioId": "v1_gray_object_types",
   "title": "Hidden Object Types",
   "protocolFamily": "single-object deterministic evidence",
   "ruleType": "deterministic_hidden_object",
   "participantRole": "active tester",
-  "instructions": "One bucket carrying three objects arrives. Test each object on the blicket detector platform, then point to the blicket and answer about each final object.",
+  "instructions": "One bucket carrying three objects arrives. Test each object on the blicket detector platform. After each result, advance to move it onto the table beside the detector. Point to the blicket among those objects, then judge each object marked by a ring.",
   "objects": [
     {
-      "id": "obj_red_cube",
-      "label": "Red cube",
-      "visible": { "shape": "cube", "color": "#D4433E", "material": "matte" },
+      "id": "obj_cube",
+      "label": "Cube",
+      "visible": { "shape": "cube", "color": "#808080", "material": "matte" },
       "hiddenBlicket": true
     },
     {
-      "id": "obj_blue_column",
-      "label": "Blue column",
-      "visible": { "shape": "column", "color": "#2F6FDB", "material": "matte" },
+      "id": "obj_column",
+      "label": "Cylinder",
+      "visible": { "shape": "column", "color": "#808080", "material": "matte" },
       "hiddenBlicket": false
     },
     {
-      "id": "obj_green_block",
-      "label": "Green block",
-      "visible": { "shape": "block", "color": "#31A861", "material": "matte" },
+      "id": "obj_block",
+      "label": "Rectangular block",
+      "visible": { "shape": "block", "color": "#808080", "material": "matte" },
       "hiddenBlicket": false
     }
   ],
   "buckets": [
-    { "id": "shared_bucket", "label": "Object bucket", "arrivalOrder": 1, "objectIds": ["obj_red_cube", "obj_blue_column", "obj_green_block"] }
+    { "id": "shared_bucket", "label": "Object bucket", "arrivalOrder": 1, "objectIds": ["obj_cube", "obj_column", "obj_block"] }
   ],
   "trialOrder": [
     {
       "trialId": "trial_1",
       "order": 1,
       "bucketId": "shared_bucket",
-      "objectId": "obj_red_cube",
+      "objectId": "obj_cube",
       "participantAction": "drag_object_to_platform",
-      "prompt": "Test the red cube from the bucket."
+      "prompt": "Test the cube from the bucket."
     },
     {
       "trialId": "trial_2",
       "order": 2,
       "bucketId": "shared_bucket",
-      "objectId": "obj_blue_column",
+      "objectId": "obj_column",
       "participantAction": "drag_object_to_platform",
-      "prompt": "Test the blue column from the bucket."
+      "prompt": "Test the cylinder from the bucket."
     },
     {
       "trialId": "trial_3",
       "order": 3,
       "bucketId": "shared_bucket",
-      "objectId": "obj_green_block",
+      "objectId": "obj_block",
       "participantAction": "drag_object_to_platform",
-      "prompt": "Test the green block from the bucket."
+      "prompt": "Test the rectangular block from the bucket."
     }
   ],
   "detector": {
@@ -68,8 +68,8 @@
     "pointPrompt": "Point to the object you think is the blicket.",
     "sequentialPrompt": "Is this object a blicket?",
     "choices": ["blicket", "not_blicket"],
-    "pointObjectIds": ["obj_red_cube", "obj_blue_column", "obj_green_block"],
-    "sequentialObjectIds": ["obj_red_cube", "obj_blue_column", "obj_green_block"]
+    "pointObjectIds": ["obj_cube", "obj_column", "obj_block"],
+    "sequentialObjectIds": ["obj_cube", "obj_column", "obj_block"]
   },
   "sourceCitations": [
     {
