@@ -1,8 +1,9 @@
 import * as THREE from './vendor/three.module.min.js';
 import { stepBucketBodies } from './bucket-physics.mjs';
+import { createSounds } from './sounds.mjs';
 
 const ui = Object.fromEntries(
-  ['scene', 'prompt', 'detail', 'progress', 'feedback', 'begin', 'next', 'download', 'restart']
+  ['scene', 'prompt', 'detail', 'progress', 'feedback', 'begin', 'next', 'restart', 'sound']
     .map((id) => [id, document.getElementById(id)]),
 );
 
@@ -10,6 +11,12 @@ const BUCKET_HOME = new THREE.Vector3(-2.25, 0, 0.2);
 const START = new THREE.Vector3(-2.25, 1.55, 0.2);
 const DETECTOR = new THREE.Vector3(1.55, 0, -0.45);
 const PLATFORM_TOP = 0.96;
+const PLATFORM_Y = 0.87;
+const PLATFORM_HALF_X = 1.10;
+const PLATFORM_HALF_Z = 0.72;
+const TABLE_TOP = -0.09;
+const RETURN_SECONDS = 0.65;
+const sounds = createSounds();
 const BUCKET_ENTRY_X = -6.6;
 const ARRIVAL_SECONDS = 1.8;
 const LIFT_SECONDS = 0.55;
@@ -28,10 +35,8 @@ let scene;
 let machine;
 let bucket;
 let platform;
-let lamp;
-let leftLight;
-let rightLight;
 let choicePads;
+let judgmentMarker;
 let currentObject;
 let stage = 'intro';
 let trialIndex = 0;
@@ -46,6 +51,10 @@ let liftFrom;
 let bucketBodies = [];
 let outcomeActivated = null;
 let outcomeAt = 0;
+let returnElapsed = 0;
+let returnFrom;
+let returnTo;
+let lastRattleAt = 0;
 
 boot().catch((error) => {
   ui.prompt.textContent = 'The game could not load.';
@@ -56,7 +65,7 @@ boot().catch((error) => {
 });
 
 async function boot() {
-  const response = await fetch('./scenario.json');
+  const response = await fetch('./scenario.json', { cache: 'no-store' });
   if (!response.ok) throw new Error(`Scenario request failed: ${response.status}`);
   scenario = await response.json();
   if (scenario.ruleType !== 'deterministic_hidden_object' || scenario.trialOrder.length !== 3 ||
@@ -71,7 +80,11 @@ async function boot() {
   ui.begin.addEventListener('click', start);
   ui.next.addEventListener('click', advance);
   ui.restart.addEventListener('click', start);
-  ui.download.addEventListener('click', downloadSession);
+  ui.sound.addEventListener('click', () => {
+    const enabled = sounds.toggle();
+    ui.sound.textContent = enabled ? 'Sound on' : 'Sound off';
+    ui.sound.setAttribute('aria-pressed', String(enabled));
+  });
   renderer.domElement.addEventListener('pointerdown', onPointerDown);
   renderer.domElement.addEventListener('pointermove', onPointerMove);
   renderer.domElement.addEventListener('pointerup', onPointerUp);
@@ -111,32 +124,27 @@ function buildScene() {
 
   machine = new THREE.Group();
   machine.position.copy(DETECTOR);
-  const body = box(2.45, 0.62, 1.67, '#48463f');
+  // Berkeley's original demonstration uses a plain dark box with a broad red top.
+  // Visual sources and adaptations are recorded in For-AI/machine-references.md.
+  const body = box(2.45, 0.62, 1.67, '#30463d');
   body.position.y = 0.37;
   machine.add(body);
-  const trim = box(2.55, 0.11, 1.78, '#716d63');
+  const trim = box(2.55, 0.11, 1.78, '#232b27');
   trim.position.y = 0.70;
   machine.add(trim);
-  platform = box(1.87, 0.18, 1.28, '#d0c2aa');
-  platform.position.y = 0.87;
+  platform = box(PLATFORM_HALF_X * 2, 0.18, PLATFORM_HALF_Z * 2, '#c9443c');
+  platform.material.roughness = 0.38;
+  platform.position.y = PLATFORM_Y;
   platform.userData.action = 'platform';
   machine.add(platform);
   pickMeshes.push(platform);
 
-  const front = box(1.05, 0.28, 0.055, '#34332f');
-  front.position.set(0, 0.36, 0.865);
-  machine.add(front);
-  machine.add(label('BLICKET', 1.0, 0.17, 0, 0.37, 0.905, '#f0eadc', '#34332f'));
-
-  lamp = new THREE.Mesh(
-    new THREE.SphereGeometry(0.155, 24, 16),
-    new THREE.MeshStandardMaterial({ color: '#55534c', emissive: '#000000', roughness: 0.35 }),
-  );
-  lamp.position.set(0, 0.48, 0.92);
-  machine.add(lamp);
-  leftLight = sideLight(-1.15);
-  rightLight = sideLight(1.15);
-  machine.add(leftLight, rightLight);
+  machine.add(label('BLICKET', 0.86, 0.16, -0.43, 0.38, 0.839, '#e9e5d9', '#30463d'));
+  for (let i = 0; i < 5; i += 1) {
+    const slot = box(0.37, 0.025, 0.012, '#19211d');
+    slot.position.set(0.62, 0.27 + i * 0.055, 0.841);
+    machine.add(slot);
+  }
   scene.add(machine);
 
   bucket = new THREE.Group();
@@ -174,10 +182,17 @@ function buildScene() {
   }
 
   choicePads = new THREE.Group();
-  choicePads.add(choicePad('blicket', -1.45, '#7a5a32', 'BLICKET'));
-  choicePads.add(choicePad('not_blicket', 1.45, '#5b5a55', 'NOT A BLICKET'));
+  choicePads.add(choicePad('blicket', 1.25, '#7a5a32', 'BLICKET'));
+  choicePads.add(choicePad('not_blicket', 2.35, '#5b5a55', 'NOT A BLICKET'));
   choicePads.visible = false;
   scene.add(choicePads);
+  judgmentMarker = new THREE.Mesh(
+    new THREE.TorusGeometry(0.62, 0.026, 8, 48),
+    new THREE.MeshBasicMaterial({ color: '#302e28' }),
+  );
+  judgmentMarker.rotation.x = -Math.PI / 2;
+  judgmentMarker.visible = false;
+  scene.add(judgmentMarker);
 }
 
 function box(width, height, depth, color) {
@@ -187,12 +202,6 @@ function box(width, height, depth, color) {
   );
   mesh.castShadow = true;
   mesh.receiveShadow = true;
-  return mesh;
-}
-
-function sideLight(x) {
-  const mesh = box(0.18, 0.33, 0.11, '#656059');
-  mesh.position.set(x, 0.38, 0.86);
   return mesh;
 }
 
@@ -233,9 +242,9 @@ function makeObject(spec) {
   return mesh;
 }
 
-function choicePad(action, x, color, text) {
+function choicePad(action, z, color, text) {
   const group = new THREE.Group();
-  group.position.set(x, 0, -1.4);
+  group.position.set(-2.1, TABLE_TOP, z);
   const pad = box(2.35, 0.22, 0.78, color);
   pad.position.y = 0.13;
   pad.userData.action = action;
@@ -263,10 +272,11 @@ function renderIntro() {
   ui.feedback.textContent = 'Click Begin to start.';
   ui.begin.hidden = false;
   ui.next.hidden = true;
-  ui.download.hidden = true;
 }
 
 function start() {
+  sounds.stop();
+  sounds.unlock();
   for (const timer of pendingTimers) clearTimeout(timer);
   pendingTimers.clear();
   session = {
@@ -285,7 +295,6 @@ function start() {
   draggedObject = false;
   ui.begin.hidden = true;
   ui.restart.hidden = false;
-  ui.download.hidden = true;
   ui.next.hidden = true;
   machine.visible = true;
   machine.position.y = 0;
@@ -293,7 +302,8 @@ function start() {
   bucket.position.set(BUCKET_ENTRY_X, 0, BUCKET_HOME.z);
   bucket.rotation.set(0, 0, 0);
   choicePads.visible = false;
-  platform.position.y = 0.87;
+  judgmentMarker.visible = false;
+  platform.position.y = PLATFORM_Y;
   setDetector(null);
   currentObject = null;
   bucketBodies = [];
@@ -310,6 +320,7 @@ function start() {
     mesh.position.set(x, 0.065 + objectHalfHeight(mesh), z);
   });
   arrivalElapsed = 0;
+  lastRattleAt = 0;
   stage = 'arrival';
   ui.progress.textContent = 'Bucket arriving';
   ui.prompt.textContent = 'Watch the bucket come onto the table.';
@@ -351,19 +362,10 @@ function readyTrial() {
 }
 
 function setDetector(outcome, lit = true) {
-  if (!lamp) return;
   const visible = outcome !== null && lit;
   const signal = outcome ? '#efae43' : '#cf6050';
   const glow = outcome ? '#df6715' : '#aa2720';
-  lamp.material.color.set(visible ? signal : '#55534c');
-  lamp.material.emissive.set(visible ? glow : '#000000');
-  lamp.material.emissiveIntensity = visible ? 1.4 : 0;
-  for (const light of [leftLight, rightLight]) {
-    light.material.color.set(visible ? signal : '#656059');
-    light.material.emissive.set(visible ? glow : '#000000');
-    light.material.emissiveIntensity = visible ? 0.7 : 0;
-  }
-  platform.material.color.set(visible ? signal : '#d0c2aa');
+  platform.material.color.set(visible ? signal : '#c9443c');
   platform.material.emissive.set(visible ? glow : '#000000');
   platform.material.emissiveIntensity = visible ? 0.7 : 0;
 }
@@ -381,6 +383,7 @@ function onPointerDown(event) {
     ui.prompt.textContent = 'Place the object on the detector platform.';
     ui.detail.textContent = 'Release it over the platform, or click the platform to place it.';
     ui.feedback.textContent = 'Object selected.';
+    sounds.play('pickup');
     log('object_picked_up', { trialId: activeTrial().trialId, objectId: currentObject.userData.objectId });
     return;
   }
@@ -466,9 +469,9 @@ function overPlatform(point, mesh) {
   const halfX = (bounds.max.x - bounds.min.x) / 2;
   const halfZ = (bounds.max.z - bounds.min.z) / 2;
   const overlapX = Math.max(0,
-    Math.min(point.x + halfX, DETECTOR.x + 0.935) - Math.max(point.x - halfX, DETECTOR.x - 0.935));
+    Math.min(point.x + halfX, DETECTOR.x + PLATFORM_HALF_X) - Math.max(point.x - halfX, DETECTOR.x - PLATFORM_HALF_X));
   const overlapZ = Math.max(0,
-    Math.min(point.z + halfZ, DETECTOR.z + 0.64) - Math.max(point.z - halfZ, DETECTOR.z - 0.64));
+    Math.min(point.z + halfZ, DETECTOR.z + PLATFORM_HALF_Z) - Math.max(point.z - halfZ, DETECTOR.z - PLATFORM_HALF_Z));
   return overlapX >= halfX && overlapZ >= halfZ;
 }
 
@@ -488,8 +491,10 @@ function placeObject() {
   setDetector(null);
   currentObject.position.set(DETECTOR.x, PLATFORM_TOP + objectHalfHeight(currentObject), DETECTOR.z);
   ui.prompt.textContent = 'The detector is checking the object…';
-  ui.detail.textContent = 'Watch the platform and light.';
+  ui.detail.textContent = 'Watch the detector platform.';
   ui.feedback.textContent = 'Checking…';
+  sounds.play('place');
+  sounds.play('press');
   log('platform_contact_detected', { trialId: trial.trialId, objectId: trial.objectId });
   const timer = setTimeout(() => {
     pendingTimers.delete(timer);
@@ -507,6 +512,7 @@ function showOutcome() {
   outcomeActivated = activated;
   outcomeAt = performance.now();
   setDetector(activated);
+  if (activated) sounds.play('activate');
   ui.prompt.textContent = activated ? 'The machine went!' : 'The machine stayed off.';
   ui.detail.textContent = activated
     ? `${spec.label} made the detector light up.`
@@ -520,7 +526,26 @@ function showOutcome() {
 
 function advance() {
   if (stage !== 'outcome') return;
-  currentObject.visible = false;
+  sounds.stop();
+  stage = 'returning';
+  returnElapsed = 0;
+  returnFrom = currentObject.position.clone();
+  returnTo = tablePosition(currentObject);
+  setDetector(null);
+  ui.next.hidden = true;
+  ui.detail.textContent = 'The tested object goes onto the table beside the machine.';
+  ui.feedback.textContent = 'Putting the object on the table.';
+}
+
+function tablePosition(object) {
+  const index = scenario.finalPrompt.pointObjectIds.indexOf(object.userData.objectId);
+  return new THREE.Vector3(0.15 + index * 1.4, TABLE_TOP + objectHalfHeight(object), 1.65);
+}
+
+function finishReturn() {
+  currentObject.position.copy(returnTo);
+  sounds.play('return');
+  log('object_returned_to_table', { trialId: activeTrial().trialId, objectId: currentObject.userData.objectId });
   trialIndex += 1;
   if (trialIndex < scenario.trialOrder.length) showTrial();
   else showPointChoice();
@@ -529,18 +554,12 @@ function advance() {
 function showPointChoice() {
   stage = 'point';
   currentObject = null;
-  bucket.visible = false;
-  machine.visible = false;
+  bucket.visible = true;
+  machine.visible = true;
   choicePads.visible = false;
-  const xPositions = [-2.3, 0, 2.3];
-  scenario.finalPrompt.pointObjectIds.forEach((id, index) => {
-    const object = objects.get(id);
-    object.visible = true;
-    object.position.set(xPositions[index], 1.15, 0);
-  });
   ui.progress.textContent = 'Your choice';
   ui.prompt.textContent = scenario.finalPrompt.pointPrompt;
-  ui.detail.textContent = 'Click one of the three 3D objects.';
+  ui.detail.textContent = 'Click one of the three objects on the table beside the machine.';
   ui.feedback.textContent = 'Choose the object you think made the machine go.';
   ui.next.hidden = true;
   log('final_point_prompt_opened', {});
@@ -549,6 +568,7 @@ function showPointChoice() {
 function submitPoint(objectId) {
   if (!scenario.finalPrompt.pointObjectIds.includes(objectId)) return;
   session.finalPointObjectId = objectId;
+  sounds.play('choice');
   log('final_point_choice_submitted', { objectId });
   judgmentIndex = 0;
   showJudgment();
@@ -558,14 +578,14 @@ function showJudgment() {
   stage = 'judge';
   const objectId = scenario.finalPrompt.sequentialObjectIds[judgmentIndex];
   const spec = scenario.objects.find((object) => object.id === objectId);
-  for (const [id, object] of objects) {
-    object.visible = id === objectId;
-    if (id === objectId) object.position.set(0, 1.55, 0.6);
-  }
+  const object = objects.get(objectId);
+  judgmentMarker.position.copy(object.position);
+  judgmentMarker.position.y = TABLE_TOP + 0.03;
+  judgmentMarker.visible = true;
   choicePads.visible = true;
   ui.progress.textContent = `Question ${judgmentIndex + 1} of ${scenario.finalPrompt.sequentialObjectIds.length}`;
   ui.prompt.textContent = `Is the ${spec.label.toLowerCase()} a blicket?`;
-  ui.detail.textContent = 'Click one of the two 3D answer pads.';
+  ui.detail.textContent = 'Look at the object with the ring, then click one of the two answer pads.';
   ui.feedback.textContent = 'Make your judgment.';
   log('final_sequential_prompt_opened', { objectId });
 }
@@ -573,6 +593,7 @@ function showJudgment() {
 function submitJudgment(saysBlicket) {
   const objectId = scenario.finalPrompt.sequentialObjectIds[judgmentIndex];
   session.judgments.push({ objectId, saysBlicket });
+  sounds.play('choice');
   log('final_sequential_choice_submitted', { objectId, saysBlicket });
   judgmentIndex += 1;
   if (judgmentIndex < scenario.finalPrompt.sequentialObjectIds.length) showJudgment();
@@ -580,19 +601,21 @@ function submitJudgment(saysBlicket) {
 }
 
 function complete() {
+  if (stage === 'complete') return;
   stage = 'complete';
   choicePads.visible = false;
-  for (const object of objects.values()) object.visible = false;
+  judgmentMarker.visible = false;
   machine.visible = true;
   bucket.visible = false;
   setDetector(null);
+  sounds.play('complete');
   session.completedAt = new Date().toISOString();
   log('session_completed', {});
   ui.progress.textContent = 'Complete';
   ui.prompt.textContent = 'All done.';
-  ui.detail.textContent = 'Your choices were saved in this browser session. Download the JSON if you want to keep them.';
+  ui.detail.textContent = 'Your session JSON downloads automatically. Check your browser’s downloads.';
   ui.feedback.textContent = 'Thank you for playing.';
-  ui.download.hidden = false;
+  downloadSession();
 }
 
 function log(type, detail) {
@@ -633,6 +656,10 @@ function animate(time) {
   }
 
   if (stage === 'arrival') {
+    if (time - lastRattleAt > 130) {
+      sounds.play('rattle');
+      lastRattleAt = time;
+    }
     arrivalElapsed += delta;
     const progress = Math.min(arrivalElapsed / ARRIVAL_SECONDS, 1);
     const eased = 1 - (1 - progress) ** 3;
@@ -642,6 +669,7 @@ function animate(time) {
     if (progress === 1) {
       bucket.position.copy(BUCKET_HOME);
       bucket.rotation.set(0, 0, 0);
+      sounds.play('land');
       log('bucket_arrived', { bucketId: scenario.buckets[0].id });
       showTrial();
     }
@@ -655,11 +683,20 @@ function animate(time) {
     if (progress === 1) readyTrial();
   }
 
+  if (stage === 'returning') {
+    returnElapsed += delta;
+    const progress = Math.min(returnElapsed / RETURN_SECONDS, 1);
+    const eased = progress * progress * (3 - 2 * progress);
+    currentObject.position.lerpVectors(returnFrom, returnTo, eased);
+    currentObject.position.y += Math.sin(progress * Math.PI) * 0.55;
+    if (progress === 1) finishReturn();
+  }
+
   const machineTargetY = stage === 'checking' || stage === 'outcome'
     ? -scenario.detector.machineDropMeters : 0;
   machine.position.y = THREE.MathUtils.damp(machine.position.y, machineTargetY, 9, delta);
   const targetY = stage === 'checking' || stage === 'outcome'
-    ? 0.87 - scenario.detector.platformDropMeters : 0.87;
+    ? PLATFORM_Y - scenario.detector.platformDropMeters : PLATFORM_Y;
   platform.position.y = THREE.MathUtils.damp(platform.position.y, targetY, 9, delta);
   if (currentObject && (stage === 'checking' || stage === 'outcome')) {
     currentObject.position.y = machine.position.y + platform.position.y + 0.09 + objectHalfHeight(currentObject);

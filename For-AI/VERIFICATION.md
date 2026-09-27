@@ -5,11 +5,15 @@ Reviewed: 2026-09-27. Use VERIFIED, PARTIAL, BLOCKED, or NOT RUN; report the sur
 ## Gates
 
 1. Context: `powershell -NoProfile -File For-AI/scripts/check-context.ps1 -ProjectRoot .`. After pushing, add `-RequireRemote`; HEAD must match remote main. Required files and routing exist; secret checks pass.
-2. Focused: `node --test tests/bucket-physics.test.mjs`. JSON parses; the three colors equal `#808080`, materials are matte, prompts/labels contain no old color names, and all trial, bucket, and response IDs resolve.
-3. Integrated: serve the repository root over HTTP in a desktop WebGL browser. Inspect three gray objects; complete all tests, point choice, and three judgments. Verify a missed drop, contact/press, both outcome signals, export, and restart. Outcomes come from `hiddenBlicket`, not appearance.
+2. Focused: `node --check game.js`, `node --check sounds.mjs`, and `node --test tests/*.test.mjs`. JSON parses; the three colors equal `#808080`, materials are matte, prompts/labels contain no old color names, and all trial, bucket, and response IDs resolve. Game-flow checks cover tabletop persistence, repeated Next input, restart during return and one complete serialized JSON download after the last judgment.
+3. Integrated: serve the repository root over HTTP in a desktop WebGL browser. Inspect three gray objects; complete all tests, point choice, and three judgments. Verify a missed drop, contact/press, both outcome signals, sounds/mute, persistent tabletop objects, automatic download with all responses/completion event, and restart. No download button should exist. Outcomes come from `hiddenBlicket`, not appearance.
 4. Publication: review explicit staged paths, push without force, verify the remote SHA and the Pages build for the public commit. Inspect hosted gray stimuli and complete the hosted flow. Publish reviewed browser code, public documentation, context, and tests only; no private archive, native source, participant data, or local artifacts.
 
 Use installed Node/Python or the Codex bundled runtime if absent from PATH. HTTP is required for fetching scenario JSON.
+
+## Detector, sound and automatic-download release
+
+2026-09-27 release candidate: syntax, all three Node tests, and the public context check VERIFIED. The public copy completed the full desktop browser flow with click/drag placement, a missed drop, both outcomes, mute and persistent tabletop objects through every judgment/completion. Console warnings/errors were empty. Earlier local source validation saved and parsed the automatically downloaded JSON, confirming three trials, point choice, three judgments, three table-return events and one final completion event. The later public-candidate disk download was BLOCKED by a full local C: drive; this is separate from the passing serialized Blob regression. Hosted publication and disk receipt must be checked after release.
 
 ## Evidence limits
 
