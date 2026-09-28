@@ -19,6 +19,8 @@ const PLATFORM_TOP = 0.96;
 const PLATFORM_Y = 0.87;
 const PLATFORM_HALF_X = 1.10;
 const PLATFORM_HALF_Z = 0.72;
+const RECESS_LIP_Y = 0.85;
+const SCAN_START_SECONDS = 0.55;
 const TABLE_TOP = -0.09;
 const RETURN_SECONDS = 0.65;
 const sounds = createSounds();
@@ -45,6 +47,9 @@ let scene;
 let machine;
 let bucket;
 let platform;
+let signFrame;
+let resultLamps = [];
+let scanBeam;
 let judgmentMarker;
 let currentObject;
 let stage = 'intro';
@@ -65,6 +70,7 @@ let returnFrom;
 let returnTo;
 let lastRattleAt = 0;
 let mixElapsed = 0;
+let checkElapsed = 0;
 let touchInput = false;
 let reducedMotion = false;
 
@@ -196,12 +202,25 @@ function buildScene() {
   machine.position.copy(DETECTOR);
   // Berkeley's original demonstration uses a plain dark box with a broad red top.
   // Visual sources and adaptations are recorded in For-AI/machine-references.md.
-  const body = box(2.45, 0.62, 1.67, '#30463d');
-  body.position.y = 0.37;
-  machine.add(body);
-  const trim = box(2.55, 0.11, 1.78, '#232b27');
-  trim.position.y = 0.70;
-  machine.add(trim);
+  const base = box(2.45, 0.26, 1.67, '#30463d');
+  base.position.y = 0.13;
+  machine.add(base);
+  for (const [width, depth, x, z] of [
+    [2.45, 0.19, 0, 0.74], [2.45, 0.19, 0, -0.74],
+    [0.18, 1.49, -1.135, 0], [0.18, 1.49, 1.135, 0],
+  ]) {
+    const wall = box(width, 0.59, depth, '#30463d');
+    wall.position.set(x, 0.555, z);
+    machine.add(wall);
+  }
+  for (const [width, depth, x, z] of [
+    [2.55, 0.13, 0, 0.84], [2.55, 0.13, 0, -0.84],
+    [0.14, 1.55, -1.2, 0], [0.14, 1.55, 1.2, 0],
+  ]) {
+    const rim = box(width, 0.08, depth, '#232b27');
+    rim.position.set(x, 0.81, z);
+    machine.add(rim);
+  }
   platform = box(PLATFORM_HALF_X * 2, 0.18, PLATFORM_HALF_Z * 2, '#c9443c');
   platform.material.roughness = 0.38;
   platform.position.y = PLATFORM_Y;
@@ -209,7 +228,42 @@ function buildScene() {
   machine.add(platform);
   pickMeshes.push(platform);
 
-  machine.add(label('BLICKET', 0.86, 0.16, -0.43, 0.38, 0.839, '#e9e5d9', '#30463d'));
+  for (const x of [-1.14, 1.14]) {
+    const upright = box(0.25, 1.60, 0.31, '#30463d');
+    upright.position.set(x, 1.64, 0.68);
+    machine.add(upright);
+    const lamp = box(0.11, 0.75, 0.035, '#24352f');
+    lamp.position.set(x, 1.42, 0.858);
+    machine.add(lamp);
+    resultLamps.push(lamp);
+  }
+  const header = box(2.55, 0.40, 0.35, '#30463d');
+  header.position.set(0, 2.59, 0.68);
+  machine.add(header);
+  signFrame = box(2.13, 0.36, 0.045, '#24352f');
+  signFrame.position.set(0, 2.59, 0.875);
+  machine.add(signFrame);
+  machine.add(label('BLICKET', 1.96, 0.27, 0, 2.59, 0.903, '#253b32', '#f3eddd'));
+  scanBeam = new THREE.Group();
+  for (const x of [-1.02, 1.02]) {
+    const emitter = new THREE.Mesh(
+      new THREE.SphereGeometry(0.065, 12, 8),
+      new THREE.MeshBasicMaterial({ color: '#b6fff4' }),
+    );
+    emitter.position.x = x;
+    scanBeam.add(emitter);
+  }
+  for (const [radius, opacity] of [[0.085, 0.22], [0.024, 0.95]]) {
+    const ray = new THREE.Mesh(
+      new THREE.CylinderGeometry(radius, radius, 2.04, 12),
+      new THREE.MeshBasicMaterial({ color: '#a7f5ee', transparent: true, opacity, depthWrite: false }),
+    );
+    ray.rotation.z = Math.PI / 2;
+    scanBeam.add(ray);
+  }
+  scanBeam.position.set(0, 1.01, 0.53);
+  scanBeam.visible = false;
+  machine.add(scanBeam);
   for (let i = 0; i < 5; i += 1) {
     const slot = box(0.37, 0.025, 0.012, '#19211d');
     slot.position.set(0.62, 0.27 + i * 0.055, 0.841);
@@ -278,7 +332,7 @@ function label(text, width, height, x, y, z, ink = '#282721', paper = '#e7dfd0')
   context.fillStyle = paper;
   context.fillRect(0, 0, 512, 128);
   context.fillStyle = ink;
-  context.font = 'bold 54px sans-serif';
+  context.font = 'bold 78px sans-serif';
   context.textAlign = 'center';
   context.textBaseline = 'middle';
   context.fillText(text, 256, 67, 480);
@@ -359,6 +413,8 @@ function start() {
   setQuiz(null);
   judgmentMarker.visible = false;
   platform.position.y = PLATFORM_Y;
+  scanBeam.visible = false;
+  checkElapsed = 0;
   setDetector(null);
   currentObject = null;
   bucketBodies = [];
@@ -426,6 +482,16 @@ function setDetector(outcome, lit = true) {
   platform.material.color.set(visible ? signal : '#c9443c');
   platform.material.emissive.set(visible ? glow : '#000000');
   platform.material.emissiveIntensity = visible ? 0.7 : 0;
+  for (const lamp of resultLamps) {
+    lamp.material.color.set(visible ? signal : '#24352f');
+    lamp.material.emissive.set(visible ? glow : '#000000');
+    lamp.material.emissiveIntensity = visible ? 1.2 : 0;
+  }
+  if (signFrame) {
+    signFrame.material.color.set(visible ? signal : '#24352f');
+    signFrame.material.emissive.set(visible ? glow : '#000000');
+    signFrame.material.emissiveIntensity = visible ? 0.65 : 0;
+  }
 }
 
 function onPointerDown(event) {
@@ -561,6 +627,7 @@ function placeObject() {
   if (stage !== 'held') return;
   const trial = activeTrial();
   stage = 'checking';
+  checkElapsed = 0;
   pointerHeld = false;
   outcomeActivated = null;
   setDetector(null);
@@ -585,6 +652,9 @@ function showOutcome() {
   const spec = scenario.objects.find((object) => object.id === trial.objectId);
   const activated = spec.hiddenBlicket === true;
   stage = 'outcome';
+  scanBeam.visible = false;
+  platform.position.y = PLATFORM_Y - (PLATFORM_TOP - RECESS_LIP_Y + objectHalfHeight(currentObject));
+  currentObject.position.y = RECESS_LIP_Y;
   outcomeActivated = activated;
   outcomeAt = performance.now();
   setDetector(activated);
@@ -813,14 +883,22 @@ function animate(time) {
     if (progress === 1) finishReturn();
   }
 
-  const machineTargetY = stage === 'checking' || stage === 'outcome'
-    ? -scenario.detector.machineDropMeters : 0;
-  machine.position.y = THREE.MathUtils.damp(machine.position.y, machineTargetY, 9, delta);
-  const targetY = stage === 'checking' || stage === 'outcome'
-    ? PLATFORM_Y - scenario.detector.platformDropMeters : PLATFORM_Y;
-  platform.position.y = THREE.MathUtils.damp(platform.position.y, targetY, 9, delta);
+  if (stage === 'checking') {
+    checkElapsed += delta;
+    const progress = Math.min(checkElapsed / SCAN_START_SECONDS, 1);
+    const eased = progress * progress * (3 - 2 * progress);
+    const drop = PLATFORM_TOP - RECESS_LIP_Y + objectHalfHeight(currentObject);
+    platform.position.y = PLATFORM_Y - drop * eased;
+    scanBeam.visible = progress === 1;
+    const scanProgress = Math.max(0, Math.min((checkElapsed - SCAN_START_SECONDS) /
+      (scenario.detector.checkDurationMs / 1000 - SCAN_START_SECONDS), 1));
+    scanBeam.position.y = RECESS_LIP_Y + 0.07 + 0.19 * Math.sin(scanProgress * Math.PI);
+  } else {
+    scanBeam.visible = false;
+    if (stage !== 'outcome') platform.position.y = THREE.MathUtils.damp(platform.position.y, PLATFORM_Y, 9, delta);
+  }
   if (currentObject && (stage === 'checking' || stage === 'outcome')) {
-    currentObject.position.y = machine.position.y + platform.position.y + 0.09 + objectHalfHeight(currentObject);
+    currentObject.position.y = platform.position.y + 0.09 + objectHalfHeight(currentObject);
   }
   if (stage === 'outcome') {
     const elapsed = time - outcomeAt;

@@ -37,6 +37,9 @@ test('objects persist and a complete session downloads once after the final judg
     machine = new THREE.Group();
     bucket = new THREE.Group();
     platform = box(2.2, 0.18, 1.44, '#c9443c');
+    signFrame = box(2.13, 0.36, 0.045, '#24352f');
+    resultLamps = [box(0.11, 0.75, 0.035, '#24352f')];
+    scanBeam = new THREE.Group();
     judgmentMarker = new THREE.Group();
     scene.add(machine, bucket);
     renderer = { render() {} };
@@ -60,8 +63,17 @@ test('objects persist and a complete session downloads once after the final judg
   assert.equal(run('overPlatform(DETECTOR, currentObject)'), true);
   assert.equal(run('overPlatform(new THREE.Vector3(DETECTOR.x + 2, 0, DETECTOR.z), currentObject)'), false);
   for (let index = 0; index < 3; index += 1) {
-    run('stage = "held"; placeObject(); showOutcome();');
+    run('stage = "held"; placeObject();');
+    if (index === 0) {
+      assert.equal(run('scanBeam.visible'), false);
+      run('for (let frame = 0; frame < 30; frame += 1) animate(lastFrame + 20);');
+      assert.equal(run('scanBeam.visible'), true);
+      assert.ok(Math.abs(run('currentObject.position.y - RECESS_LIP_Y')) < 1e-8);
+    }
+    run('showOutcome();');
     assert.equal(run('stage'), 'outcome');
+    assert.equal(run('scanBeam.visible'), false);
+    assert.ok(run('signFrame.material.emissiveIntensity > 0'));
     assert.equal(run('session.trials.at(-1).activated'), index === 0);
     run('advance();');
     assert.equal(run('stage'), 'returning');

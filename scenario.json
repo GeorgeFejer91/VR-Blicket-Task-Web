@@ -56,12 +56,10 @@
     }
   ],
   "detector": {
-    "platformDropMeters": 0.11,
-    "machineDropMeters": 0.055,
-    "checkDurationMs": 900,
+    "checkDurationMs": 1500,
     "activationDurationMs": 1400,
-    "activeCue": "gold_platform_blink",
-    "inactiveCue": "red_platform_blink"
+    "activeCue": "gold_detector_blink",
+    "inactiveCue": "red_detector_blink"
   },
   "finalPrompt": {
     "prompt": "Point to the object you think is the blicket.",
