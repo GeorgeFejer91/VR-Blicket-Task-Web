@@ -13,7 +13,9 @@ Use installed Node/Python or the Codex bundled runtime if absent from PATH. HTTP
 
 ## Current three-sequence evidence
 
-2026-09-29 local source candidate: VERIFIED for the desktop browser flow. Five Node tests pass. Chromium pointer play completed all 18 single/pair checks and nine judgments; downloaded v2 JSON contains three phase starts, 18 trials, nine judgments, 11 activations, and one completion. Browser warnings/errors: zero. Screenshots confirmed two objects inside the well during an OR scan and the conjunctive A+C scan. A 320×700 completion view had no horizontal clipping. Physical touch input and scientific validation are NOT RUN. The archived narration tests still verify shipped assets, while runtime speech is dormant. Hosted publication is pending for this revision.
+2026-09-29 local source candidate: VERIFIED for the desktop browser flow. Five Node tests pass. Chromium pointer play completed all 18 single/pair checks and nine judgments; downloaded v2 JSON contains three phase starts, 18 trials, nine judgments, 11 activations, and one completion. Browser warnings/errors: zero. Screenshots confirmed two objects inside the well during an OR scan and the conjunctive A+C scan. A 320×700 completion view had no horizontal clipping. Physical touch input and scientific validation are NOT RUN. The archived narration tests still verify shipped assets, while runtime speech is dormant.
+
+Hosted release `69db781`: VERIFIED. GitHub Pages built the matching code commit. Hosted Chromium pointer play completed all 18 checks and nine judgments. Its downloaded v2 JSON contains three phase starts, 18 trials, nine judgments, 11 activations, and one completion; the scenario ID is `functional_form_or_or_and_gray_v1`. A hosted screenshot shows the conjunctive A+C pair side by side inside the machine during scanning. The hosted browser reported zero warnings and errors. The private source archive and local test exports were not published. Physical touch input and scientific validation remain NOT RUN.
 
 ## Bilingual decision and narration gate
 
