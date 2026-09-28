@@ -2,7 +2,7 @@ const strings = {
   en: {
     subtitle: 'A small 3D causal discovery game', ready: 'Ready to begin', soundOn: 'Sound on', soundOff: 'Sound off', restart: 'Restart', begin: 'Begin',
     languageTitle: 'Choose a language', languageDetail: 'The game and narrator will use your choice.',
-    introPrompt: 'Find out which object makes the detector go.', introDetail: 'Put each object on the 3D detector, watch what happens, then make your choices.', introFeedback: 'Choose a language, then select Begin.',
+    introPrompt: 'What is a blicket?', introDetail: 'You cannot tell by looking. Blicketness makes the machine light up and play music. Test the objects to find out.', introFeedback: 'Choose a language, then select Begin.', introListening: 'Listen to the introduction, then press Begin.', introReady: 'Press Begin when you are ready.',
     bucketArriving: 'Bucket arriving', arrivalPrompt: 'Watch the bucket come onto the table.', arrivalDetail: 'Three objects are moving inside it.', arrivalFeedback: 'The objects are rattling together.',
     mixing: 'Mixing objects', mixingPrompt: 'Watch the objects mix inside the bucket.', mixingDetail: 'The bucket shakes before the first object comes out.',
     objectProgress: 'Object {index} of {total}', showPrompt: 'Here is the {object}.', showDetail: 'Watch it come out of the bucket.', showFeedback: 'Getting the object ready.',
@@ -19,7 +19,7 @@ const strings = {
   de: {
     subtitle: 'Ein kleines 3D-Spiel zum Entdecken von Ursachen', ready: 'Bereit zum Start', soundOn: 'Ton an', soundOff: 'Ton aus', restart: 'Neustart', begin: 'Start',
     languageTitle: 'Sprache wählen', languageDetail: 'Spiel und Erzähler verwenden deine Auswahl.',
-    introPrompt: 'Finde heraus, welches Objekt die Maschine anschaltet.', introDetail: 'Lege jedes Objekt auf die 3D-Maschine, beobachte, was passiert, und triff dann deine Auswahl.', introFeedback: 'Wähle eine Sprache und drücke dann Start.',
+    introPrompt: 'Was ist ein Blicket?', introDetail: 'Ob etwas ein Blicket ist, sieht man nicht. Blicketness lässt die Maschine leuchten und Musik spielen. Teste die Objekte, um es herauszufinden.', introFeedback: 'Wähle eine Sprache und drücke dann Start.', introListening: 'Hör dir die Einführung an und drücke dann Start.', introReady: 'Drücke Start, wenn du bereit bist.',
     bucketArriving: 'Eimer kommt an', arrivalPrompt: 'Schau zu, wie der Eimer auf den Tisch kommt.', arrivalDetail: 'Drei Objekte bewegen sich darin.', arrivalFeedback: 'Die Objekte klappern im Eimer.',
     mixing: 'Objekte werden gemischt', mixingPrompt: 'Schau zu, wie sich die Objekte im Eimer mischen.', mixingDetail: 'Der Eimer schüttelt sich, bevor das erste Objekt herauskommt.',
     objectProgress: 'Objekt {index} von {total}', showPrompt: 'Hier ist der {object}.', showDetail: 'Schau zu, wie es aus dem Eimer kommt.', showFeedback: 'Das Objekt wird vorbereitet.',

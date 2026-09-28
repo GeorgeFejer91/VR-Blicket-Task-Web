@@ -2,8 +2,8 @@ import * as THREE from './vendor/three.module.min.js';
 import { stepBucketBodies } from './bucket-physics.mjs';
 import { createSounds } from './sounds.mjs?v=20260928f';
 import { sizeTextRegions } from './text-layout.mjs?v=20260928c';
-import { copy, objectName } from './copy.mjs';
-import { createNarration } from './narration.mjs?v=20260928g';
+import { copy, objectName } from './copy.mjs?v=20260928i';
+import { createNarration } from './narration.mjs?v=20260928i';
 
 const ui = Object.fromEntries(
   ['scene', 'prompt', 'detail', 'progress', 'feedback', 'begin', 'next', 'restart', 'sound',
@@ -21,13 +21,13 @@ const PLATFORM_HALF_X = 1.00;
 const PLATFORM_HALF_Z = 1.00;
 const RECESS_LIP_Y = 2.15;
 const SCAN_START_SECONDS = 0.55;
-const REVEAL_PAUSE_MS = 650;
-const RESULT_VOICE_MARGIN_MS = 100;
+const REVEAL_PAUSE_MS = 950;
 const TABLE_TOP = -0.09;
 const RETURN_SECONDS = 0.65;
 const sounds = createSounds();
 let narration;
 let language = 'en';
+let languageChosen = false;
 const t = (key, values) => copy(language, key, values);
 const nameOf = (id) => objectName(id, language);
 const BUCKET_ENTRY_X = -6.6;
@@ -110,12 +110,18 @@ async function boot() {
   for (const code of ['en', 'de']) {
     ui[`language-${code}`].addEventListener('click', () => {
       language = code;
+      languageChosen = true;
       document.documentElement.lang = code;
       narration.setLanguage(code);
       applyLanguage();
-      ui.begin.disabled = false;
-      ui.begin.focus({ preventScroll: true });
-      narration.play('intro');
+      ui.begin.disabled = true;
+      ui.feedback.textContent = t('introListening');
+      narration.play('intro', false, () => {
+        if (stage !== 'intro' || !languageChosen) return;
+        ui.begin.disabled = false;
+        ui.feedback.textContent = t('introReady');
+        ui.begin.focus({ preventScroll: true });
+      });
     });
   }
   for (const id of scenario.finalPrompt.pointObjectIds) {
@@ -131,6 +137,10 @@ async function boot() {
     narration.setEnabled(enabled);
     ui.sound.textContent = t(enabled ? 'soundOn' : 'soundOff');
     ui.sound.setAttribute('aria-pressed', String(enabled));
+    if (!enabled && stage === 'intro' && languageChosen) {
+      ui.begin.disabled = false;
+      ui.feedback.textContent = t('introReady');
+    }
   });
   renderer.domElement.addEventListener('pointerdown', onPointerDown);
   renderer.domElement.addEventListener('pointermove', onPointerMove);
@@ -469,7 +479,6 @@ function start() {
   ui.detail.textContent = t('arrivalDetail');
   ui.feedback.textContent = t('arrivalFeedback');
   log('bucket_arrival_started', { bucketId: scenario.buckets[0].id, objectIds: scenario.buckets[0].objectIds });
-  narration?.play('arrival');
 }
 
 function showTrial() {
@@ -684,11 +693,6 @@ function placeObject() {
   sounds.play('place');
   sounds.play('press');
   log('platform_contact_detected', { trialId: trial.trialId, objectId: trial.objectId });
-  const scanCueTimer = setTimeout(() => {
-    pendingTimers.delete(scanCueTimer);
-    if (stage === 'checking') narration?.play('checking');
-  }, SCAN_START_SECONDS * 1000);
-  pendingTimers.add(scanCueTimer);
   const timer = setTimeout(() => {
     pendingTimers.delete(timer);
     showOutcome();
@@ -718,11 +722,6 @@ function showOutcome() {
   ui.next.textContent = t(trialIndex + 1 < scenario.trialOrder.length ? 'next' : 'choices');
   session.trials.push({ trialId: trial.trialId, objectId: trial.objectId, activated });
   log('detector_outcome', { trialId: trial.trialId, objectId: trial.objectId, activated });
-  const resultCueTimer = setTimeout(() => {
-    pendingTimers.delete(resultCueTimer);
-    if (stage === 'outcome') narration?.play(activated ? 'activated' : 'inactive', true);
-  }, Math.max(scenario.detector.activationDurationMs, 1400) + RESULT_VOICE_MARGIN_MS);
-  pendingTimers.add(resultCueTimer);
 }
 
 function advance() {
@@ -819,7 +818,6 @@ function complete() {
   ui.prompt.textContent = t('completePrompt');
   ui.detail.textContent = t('completeDetail');
   ui.feedback.textContent = t('completeFeedback');
-  narration?.play('complete');
   downloadSession();
 }
 
@@ -902,7 +900,6 @@ function animate(time) {
       ui.prompt.textContent = t('mixingPrompt');
       ui.detail.textContent = t('mixingDetail');
       log('bucket_mixing_started', { bucketId: scenario.buckets[0].id });
-      narration?.play('mixing', true);
     }
   }
 

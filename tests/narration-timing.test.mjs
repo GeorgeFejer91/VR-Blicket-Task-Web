@@ -55,3 +55,23 @@ test('narration leaves a pause between cues and cancels waiting speech when mute
   narration.play('trial');
   assert.deepEqual(starts, [0, 800, 1649]);
 });
+
+test('introduction completion releases Begin, including when audio is unavailable', (t) => {
+  const previousAudio = globalThis.Audio;
+  t.after(() => { globalThis.Audio = previousAudio; });
+  let clip;
+  globalThis.Audio = class {
+    constructor() { clip = this; }
+    play() { return Promise.resolve(); }
+    pause() {}
+  };
+  const narration = createNarration({ narration: [{ id: 'intro', files: { en: 'en/intro.mp3' } }] });
+  let completed = 0;
+  narration.play('intro', false, () => { completed += 1; });
+  assert.equal(completed, 0);
+  clip.onended();
+  assert.equal(completed, 1);
+  narration.setEnabled(false);
+  narration.play('intro', false, () => { completed += 1; });
+  assert.equal(completed, 2);
+});

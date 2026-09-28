@@ -76,11 +76,9 @@ test('objects persist and a complete session downloads once after the final judg
   assert.equal(run('overPlatform(new THREE.Vector3(DETECTOR.x + 2, 0, DETECTOR.z), currentObject)'), false);
   for (let index = 0; index < 3; index += 1) {
     run('stage = "held"; placeObject();');
-    assert.deepEqual(scheduled.slice(-2).map(({ delay }) => delay), [550, 4250]);
+    assert.equal(scheduled.at(-1).delay, 4550);
     assert.equal(run('scanBeam.visible'), false);
     run('for (let frame = 0; frame < 30; frame += 1) animate(lastFrame + 20);');
-    scheduled.at(-2).callback();
-    assert.equal(spoken.at(-1), 'checking');
     assert.equal(run('scanBeam.visible'), true);
     assert.equal(run('scanBounce.visible'), true);
     assert.equal(run('scanFloodLight.intensity'), 5);
@@ -91,10 +89,9 @@ test('objects persist and a complete session downloads once after the final judg
     assert.equal(run('scanBeam.visible'), false);
     assert.equal(run('scanFloodLight.intensity'), 0);
     run('showOutcome();');
-    assert.equal(scheduled.at(-1).delay, 1500);
-    assert.equal(spoken.at(-1), 'checking');
-    scheduled.at(-1).callback();
-    assert.equal(spoken.at(-1), index === 0 ? 'activated' : 'inactive');
+    assert.equal(spoken.includes('checking'), false);
+    assert.equal(spoken.includes('activated'), false);
+    assert.equal(spoken.includes('inactive'), false);
     assert.equal(run('stage'), 'outcome');
     assert.equal(run('scanBeam.visible'), false);
     assert.equal(run('scanBounce.visible'), false);
@@ -137,6 +134,7 @@ test('objects persist and a complete session downloads once after the final judg
     run(`submitJudgment(${index === 0});`);
   }
   assert.equal(run('stage'), 'complete');
+  assert.deepEqual(spoken, ['trial_cube', 'trial_column', 'trial_block', 'point', 'judge_cube', 'judge_column', 'judge_block']);
   assert.equal(elements.get('quiz').hidden, true);
   assert.equal(run('session.judgments.length'), 3);
   assert.equal(run('[...objects.values()].every(object => object.visible)'), true);
