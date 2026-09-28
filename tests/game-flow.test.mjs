@@ -35,11 +35,19 @@ test('objects persist and a complete session downloads once after the final judg
     scenario = fixture;
     scene = new THREE.Scene();
     machine = new THREE.Group();
+    machine.position.copy(DETECTOR);
     bucket = new THREE.Group();
     platform = box(2.2, 0.18, 1.44, '#c9443c');
     signFrame = box(2.13, 0.36, 0.045, '#24352f');
+    machineLabel = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.2), new THREE.MeshBasicMaterial());
+    labelLight = new THREE.PointLight('#ffd178', 0, 1.8);
     resultLamps = [box(0.11, 0.75, 0.035, '#24352f')];
     scanBeam = new THREE.Group();
+    scanBeam.position.z = 0.18;
+    scanBounce = new THREE.Group();
+    machine.add(scanBounce);
+    scanFloodLight = new THREE.PointLight('#82fff1', 0, 2.5);
+    machine.add(scanFloodLight);
     judgmentMarker = new THREE.Group();
     scene.add(machine, bucket);
     renderer = { render() {} };
@@ -64,16 +72,21 @@ test('objects persist and a complete session downloads once after the final judg
   assert.equal(run('overPlatform(new THREE.Vector3(DETECTOR.x + 2, 0, DETECTOR.z), currentObject)'), false);
   for (let index = 0; index < 3; index += 1) {
     run('stage = "held"; placeObject();');
-    if (index === 0) {
-      assert.equal(run('scanBeam.visible'), false);
-      run('for (let frame = 0; frame < 30; frame += 1) animate(lastFrame + 20);');
-      assert.equal(run('scanBeam.visible'), true);
-      assert.ok(Math.abs(run('currentObject.position.y - RECESS_LIP_Y')) < 1e-8);
-    }
+    assert.equal(run('scanBeam.visible'), false);
+    run('for (let frame = 0; frame < 30; frame += 1) animate(lastFrame + 20);');
+    assert.equal(run('scanBeam.visible'), true);
+    assert.equal(run('scanBounce.visible'), true);
+    assert.equal(run('scanFloodLight.intensity'), 5);
+    assert.ok(run('scanBounce.position.x < 0'));
+    assert.ok(Math.abs(run('currentObject.position.y - RECESS_LIP_Y')) < 1e-8);
     run('showOutcome();');
     assert.equal(run('stage'), 'outcome');
     assert.equal(run('scanBeam.visible'), false);
-    assert.ok(run('signFrame.material.emissiveIntensity > 0'));
+    assert.equal(run('scanBounce.visible'), false);
+    assert.equal(run('scanFloodLight.intensity'), 0);
+    assert.equal(run('signFrame.material.emissiveIntensity > 0'), index === 0);
+    assert.equal(run('labelLight.intensity > 0'), index === 0);
+    assert.equal(run('machineLabel.material.color.getHexString()'), index === 0 ? 'ffedb0' : 'ffffff');
     assert.equal(run('session.trials.at(-1).activated'), index === 0);
     run('advance();');
     assert.equal(run('stage'), 'returning');
@@ -155,7 +168,7 @@ test('objects persist and a complete session downloads once after the final judg
       camera = new THREE.PerspectiveCamera(37, 1, 0.1, 100);
       resize();
     `);
-    assert.ok(run(`[-4, 4.1].every(x => [-0.1, 2.8].every(y => [-1.5, 3.6].every(z => {
+    assert.ok(run(`[-4, 4.1].every(x => [-0.1, 3.6].every(y => [-1.5, 3.6].every(z => {
       const point = new THREE.Vector3(x, y, z).project(camera);
       return Math.abs(point.x) <= 0.93 && Math.abs(point.y) <= 0.93;
     })))`));

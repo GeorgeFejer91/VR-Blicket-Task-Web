@@ -15,11 +15,11 @@ const ui = Object.fromEntries(
 const BUCKET_HOME = new THREE.Vector3(-2.25, 0, 0.2);
 const START = new THREE.Vector3(-2.25, 2.18, 0.2);
 const DETECTOR = new THREE.Vector3(1.55, 0, -0.45);
-const PLATFORM_TOP = 0.96;
-const PLATFORM_Y = 0.87;
+const PLATFORM_TOP = 1.34;
+const PLATFORM_Y = 1.25;
 const PLATFORM_HALF_X = 1.10;
 const PLATFORM_HALF_Z = 0.72;
-const RECESS_LIP_Y = 0.85;
+const RECESS_LIP_Y = 1.20;
 const SCAN_START_SECONDS = 0.55;
 const TABLE_TOP = -0.09;
 const RETURN_SECONDS = 0.65;
@@ -33,6 +33,8 @@ const ARRIVAL_SECONDS = 1.8;
 const MIX_SECONDS = 1.45;
 const LIFT_SECONDS = 0.55;
 const raycaster = new THREE.Raycaster();
+const scanRaycaster = new THREE.Raycaster();
+scanRaycaster.far = 2.1;
 const pointer = new THREE.Vector2();
 const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -PLATFORM_TOP);
 const dropPoint = new THREE.Vector3();
@@ -48,8 +50,12 @@ let machine;
 let bucket;
 let platform;
 let signFrame;
+let machineLabel;
+let labelLight;
 let resultLamps = [];
 let scanBeam;
+let scanBounce;
+let scanFloodLight;
 let judgmentMarker;
 let currentObject;
 let stage = 'intro';
@@ -209,8 +215,8 @@ function buildScene() {
     [2.45, 0.19, 0, 0.74], [2.45, 0.19, 0, -0.74],
     [0.18, 1.49, -1.135, 0], [0.18, 1.49, 1.135, 0],
   ]) {
-    const wall = box(width, 0.59, depth, '#30463d');
-    wall.position.set(x, 0.555, z);
+    const wall = box(width, 0.99, depth, '#30463d');
+    wall.position.set(x, 0.755, z);
     machine.add(wall);
   }
   for (const [width, depth, x, z] of [
@@ -218,7 +224,7 @@ function buildScene() {
     [0.14, 1.55, -1.2, 0], [0.14, 1.55, 1.2, 0],
   ]) {
     const rim = box(width, 0.08, depth, '#232b27');
-    rim.position.set(x, 0.81, z);
+    rim.position.set(x, 1.27, z);
     machine.add(rim);
   }
   platform = box(PLATFORM_HALF_X * 2, 0.18, PLATFORM_HALF_Z * 2, '#c9443c');
@@ -229,21 +235,25 @@ function buildScene() {
   pickMeshes.push(platform);
 
   for (const x of [-1.14, 1.14]) {
-    const upright = box(0.25, 1.60, 0.31, '#30463d');
-    upright.position.set(x, 1.64, 0.68);
+    const upright = box(0.25, 2.05, 0.31, '#30463d');
+    upright.position.set(x, 2.285, 0.68);
     machine.add(upright);
-    const lamp = box(0.11, 0.75, 0.035, '#24352f');
-    lamp.position.set(x, 1.42, 0.858);
+    const lamp = box(0.11, 0.9, 0.035, '#24352f');
+    lamp.position.set(x, 2.28, 0.858);
     machine.add(lamp);
     resultLamps.push(lamp);
   }
   const header = box(2.55, 0.40, 0.35, '#30463d');
-  header.position.set(0, 2.59, 0.68);
+  header.position.set(0, 3.31, 0.68);
   machine.add(header);
-  signFrame = box(2.13, 0.36, 0.045, '#24352f');
-  signFrame.position.set(0, 2.59, 0.875);
+  signFrame = box(2.28, 0.62, 0.045, '#24352f');
+  signFrame.position.set(0, 0.71, 0.864);
   machine.add(signFrame);
-  machine.add(label('BLICKET', 1.96, 0.27, 0, 2.59, 0.903, '#253b32', '#f3eddd'));
+  machineLabel = label('BLICKET', 2.12, 0.46, 0, 0.71, 0.893, '#253b32', '#f3eddd');
+  machine.add(machineLabel);
+  labelLight = new THREE.PointLight('#ffd178', 0, 1.8);
+  labelLight.position.set(0, 0.71, 1.02);
+  machine.add(labelLight);
   scanBeam = new THREE.Group();
   for (const x of [-1.02, 1.02]) {
     const emitter = new THREE.Mesh(
@@ -261,14 +271,35 @@ function buildScene() {
     ray.rotation.z = Math.PI / 2;
     scanBeam.add(ray);
   }
-  scanBeam.position.set(0, 1.01, 0.53);
+  scanBeam.position.set(0, 1.37, 0.18);
   scanBeam.visible = false;
   machine.add(scanBeam);
-  for (let i = 0; i < 5; i += 1) {
-    const slot = box(0.37, 0.025, 0.012, '#19211d');
-    slot.position.set(0.62, 0.27 + i * 0.055, 0.841);
-    machine.add(slot);
+  scanBounce = new THREE.Group();
+  scanBounce.visible = false;
+  for (const [radius, opacity] of [[0.15, 0.22], [0.055, 0.9]]) {
+    scanBounce.add(new THREE.Mesh(
+      new THREE.SphereGeometry(radius, 12, 8),
+      new THREE.MeshBasicMaterial({ color: '#c0fff5', transparent: true, opacity,
+        blending: THREE.AdditiveBlending, depthWrite: false }),
+    ));
   }
+  for (const end of [[-0.34, 0.30, 0.55], [0.08, 0.55, 0.54], [0.48, 0.20, 0.52]]) {
+    const direction = new THREE.Vector3(...end);
+    const ray = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.008, 0.017, direction.length(), 6),
+      new THREE.MeshBasicMaterial({ color: '#a7f5ee', transparent: true, opacity: 0.55,
+        blending: THREE.AdditiveBlending, depthWrite: false }),
+    );
+    ray.position.copy(direction).multiplyScalar(0.5);
+    ray.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+    scanBounce.add(ray);
+  }
+  const bouncedLight = new THREE.PointLight('#9cfff2', 2.5, 1.5);
+  scanBounce.add(bouncedLight);
+  machine.add(scanBounce);
+  scanFloodLight = new THREE.PointLight('#82fff1', 0, 2.5);
+  scanFloodLight.position.set(0, 1.65, 0.75);
+  machine.add(scanFloodLight);
   scene.add(machine);
 
   bucket = new THREE.Group();
@@ -332,7 +363,7 @@ function label(text, width, height, x, y, z, ink = '#282721', paper = '#e7dfd0')
   context.fillStyle = paper;
   context.fillRect(0, 0, 512, 128);
   context.fillStyle = ink;
-  context.font = 'bold 78px sans-serif';
+  context.font = 'bold 105px sans-serif';
   context.textAlign = 'center';
   context.textBaseline = 'middle';
   context.fillText(text, 256, 67, 480);
@@ -414,6 +445,8 @@ function start() {
   judgmentMarker.visible = false;
   platform.position.y = PLATFORM_Y;
   scanBeam.visible = false;
+  scanBounce.visible = false;
+  scanFloodLight.intensity = 0;
   checkElapsed = 0;
   setDetector(null);
   currentObject = null;
@@ -488,10 +521,28 @@ function setDetector(outcome, lit = true) {
     lamp.material.emissiveIntensity = visible ? 1.2 : 0;
   }
   if (signFrame) {
-    signFrame.material.color.set(visible ? signal : '#24352f');
-    signFrame.material.emissive.set(visible ? glow : '#000000');
-    signFrame.material.emissiveIntensity = visible ? 0.65 : 0;
+    const labelActive = visible && outcome === true;
+    signFrame.material.color.set(labelActive ? '#ffcc68' : '#24352f');
+    signFrame.material.emissive.set(labelActive ? '#ff981c' : '#000000');
+    signFrame.material.emissiveIntensity = labelActive ? 1.4 : 0;
+    if (machineLabel) machineLabel.material.color.set(labelActive ? '#ffedb0' : '#ffffff');
+    if (labelLight) labelLight.intensity = labelActive ? 3.2 : 0;
   }
+}
+
+function updateScanBounce() {
+  scanBounce.visible = false;
+  scanFloodLight.intensity = scanBeam.visible ? 5 : 0;
+  if (!scanBeam.visible || !currentObject) return;
+  scanFloodLight.position.y = scanBeam.position.y + 0.32;
+  machine.updateWorldMatrix(true, false);
+  currentObject.updateWorldMatrix(true, false);
+  const origin = machine.localToWorld(new THREE.Vector3(-1.02, scanBeam.position.y, scanBeam.position.z));
+  scanRaycaster.set(origin, new THREE.Vector3(1, 0, 0));
+  const hit = scanRaycaster.intersectObject(currentObject, false)[0];
+  if (!hit) return;
+  scanBounce.position.copy(machine.worldToLocal(hit.point.clone()));
+  scanBounce.visible = true;
 }
 
 function onPointerDown(event) {
@@ -653,6 +704,8 @@ function showOutcome() {
   const activated = spec.hiddenBlicket === true;
   stage = 'outcome';
   scanBeam.visible = false;
+  scanBounce.visible = false;
+  scanFloodLight.intensity = 0;
   platform.position.y = PLATFORM_Y - (PLATFORM_TOP - RECESS_LIP_Y + objectHalfHeight(currentObject));
   currentObject.position.y = RECESS_LIP_Y;
   outcomeActivated = activated;
@@ -795,7 +848,7 @@ function resize() {
   const up = new THREE.Vector3().crossVectors(direction, new THREE.Vector3(1, 0, 0));
   const tangent = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * 0.92;
   let distance = 8.6;
-  for (const x of [-4, 4.1]) for (const y of [-0.1, 2.8]) for (const z of [-1.5, 3.6]) {
+  for (const x of [-4, 4.1]) for (const y of [-0.1, 3.6]) for (const z of [-1.5, 3.6]) {
     const corner = new THREE.Vector3(x, y, z).sub(target);
     distance = Math.max(distance, corner.dot(direction) +
       Math.max(Math.abs(corner.x) / (tangent * camera.aspect), Math.abs(corner.dot(up)) / tangent));
@@ -900,6 +953,7 @@ function animate(time) {
   if (currentObject && (stage === 'checking' || stage === 'outcome')) {
     currentObject.position.y = platform.position.y + 0.09 + objectHalfHeight(currentObject);
   }
+  updateScanBounce();
   if (stage === 'outcome') {
     const elapsed = time - outcomeAt;
     const pulseOn = elapsed >= Math.max(scenario.detector.activationDurationMs, 1400) ||
