@@ -68,7 +68,7 @@ export function createSounds() {
         case 'land': tap(0.24); break;
         case 'pickup': tone(290, 0.1, 0.09, 0, 450); break;
         case 'place': tap(0.22); break;
-        case 'press': tone(95, 0.18, 0.12, 0, 55); break;
+        case 'press': tone(95, 0.18, 0.12, 0.16, 55); break;
         case 'return': tap(0.17); break;
         case 'choice': tone(420, 0.075, 0.09); break;
         case 'activate':

@@ -1,18 +1,31 @@
 export function createNarration(inventory, onSpeaking = () => {}) {
+  const PAUSE_MS = 700;
   const cues = new Map(inventory.narration.map((cue) => [cue.id, cue]));
   let language = 'en';
   let enabled = true;
   let audio;
   let pending = [];
+  let pauseTimer;
+  let nextCueAt = 0;
 
   function stop() {
     pending = [];
-    if (audio) { audio.pause(); audio.currentTime = 0; audio = null; }
+    clearTimeout(pauseTimer);
+    pauseTimer = null;
+    if (audio) {
+      audio.pause(); audio.currentTime = 0; audio = null;
+      nextCueAt = Date.now() + PAUSE_MS;
+    }
     onSpeaking(false);
   }
 
   function playNext(id) {
     if (!enabled || !cues.has(id) || typeof Audio === 'undefined') return;
+    const wait = nextCueAt - Date.now();
+    if (wait > 0) {
+      pauseTimer = setTimeout(() => { pauseTimer = null; playNext(id); }, wait);
+      return;
+    }
     const file = cues.get(id).files[language];
     const clip = new Audio(new URL(`./audio/${file}`, import.meta.url));
     audio = clip;
@@ -20,9 +33,10 @@ export function createNarration(inventory, onSpeaking = () => {}) {
     const finished = () => {
       if (audio !== clip) return;
       audio = null;
+      nextCueAt = Date.now() + PAUSE_MS;
+      onSpeaking(false);
       const next = pending.shift();
       if (next) playNext(next);
-      else onSpeaking(false);
     };
     clip.onended = finished;
     clip.onerror = finished;
@@ -35,7 +49,7 @@ export function createNarration(inventory, onSpeaking = () => {}) {
     setLanguage(value) { language = value; stop(); },
     setEnabled(value) { enabled = value; if (!enabled) stop(); },
     play(id, queue = false) {
-      if (queue && audio) { pending.push(id); return; }
+      if (queue && (audio || pauseTimer)) { pending.push(id); return; }
       stop();
       playNext(id);
     },

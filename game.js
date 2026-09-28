@@ -1,9 +1,9 @@
 import * as THREE from './vendor/three.module.min.js';
 import { stepBucketBodies } from './bucket-physics.mjs';
-import { createSounds } from './sounds.mjs';
+import { createSounds } from './sounds.mjs?v=20260928f';
 import { sizeTextRegions } from './text-layout.mjs?v=20260928c';
 import { copy, objectName } from './copy.mjs';
-import { createNarration } from './narration.mjs';
+import { createNarration } from './narration.mjs?v=20260928f';
 
 const ui = Object.fromEntries(
   ['scene', 'prompt', 'detail', 'progress', 'feedback', 'begin', 'next', 'restart', 'sound',
@@ -13,13 +13,13 @@ const ui = Object.fromEntries(
 );
 
 const BUCKET_HOME = new THREE.Vector3(-2.25, 0, 0.2);
-const START = new THREE.Vector3(-2.25, 2.18, 0.2);
+const START = new THREE.Vector3(-2.25, 3.05, 0.2);
 const DETECTOR = new THREE.Vector3(1.55, 0, -0.45);
-const PLATFORM_TOP = 1.34;
-const PLATFORM_Y = 1.25;
-const PLATFORM_HALF_X = 1.10;
-const PLATFORM_HALF_Z = 0.72;
-const RECESS_LIP_Y = 1.20;
+const PLATFORM_TOP = 2.29;
+const PLATFORM_Y = 2.20;
+const PLATFORM_HALF_X = 1.00;
+const PLATFORM_HALF_Z = 1.00;
+const RECESS_LIP_Y = 2.15;
 const SCAN_START_SECONDS = 0.55;
 const TABLE_TOP = -0.09;
 const RETURN_SECONDS = 0.65;
@@ -208,23 +208,23 @@ function buildScene() {
   machine.position.copy(DETECTOR);
   // Berkeley's original demonstration uses a plain dark box with a broad red top.
   // Visual sources and adaptations are recorded in For-AI/machine-references.md.
-  const base = box(2.45, 0.26, 1.67, '#30463d');
+  const base = box(2.45, 0.26, 2.45, '#30463d');
   base.position.y = 0.13;
   machine.add(base);
   for (const [width, depth, x, z] of [
-    [2.45, 0.19, 0, 0.74], [2.45, 0.19, 0, -0.74],
-    [0.18, 1.49, -1.135, 0], [0.18, 1.49, 1.135, 0],
+    [2.45, 0.19, 0, 1.14], [2.45, 0.19, 0, -1.14],
+    [0.18, 2.29, -1.135, 0], [0.18, 2.29, 1.135, 0],
   ]) {
-    const wall = box(width, 0.99, depth, '#30463d');
-    wall.position.set(x, 0.755, z);
+    const wall = box(width, 1.96, depth, '#30463d');
+    wall.position.set(x, 1.24, z);
     machine.add(wall);
   }
   for (const [width, depth, x, z] of [
-    [2.55, 0.13, 0, 0.84], [2.55, 0.13, 0, -0.84],
-    [0.14, 1.55, -1.2, 0], [0.14, 1.55, 1.2, 0],
+    [2.55, 0.13, 0, 1.23], [2.55, 0.13, 0, -1.23],
+    [0.14, 2.35, -1.2, 0], [0.14, 2.35, 1.2, 0],
   ]) {
     const rim = box(width, 0.08, depth, '#232b27');
-    rim.position.set(x, 1.27, z);
+    rim.position.set(x, 2.23, z);
     machine.add(rim);
   }
   platform = box(PLATFORM_HALF_X * 2, 0.18, PLATFORM_HALF_Z * 2, '#c9443c');
@@ -235,24 +235,18 @@ function buildScene() {
   pickMeshes.push(platform);
 
   for (const x of [-1.14, 1.14]) {
-    const upright = box(0.25, 2.05, 0.31, '#30463d');
-    upright.position.set(x, 2.285, 0.68);
-    machine.add(upright);
-    const lamp = box(0.11, 0.9, 0.035, '#24352f');
-    lamp.position.set(x, 2.28, 0.858);
+    const lamp = box(0.11, 0.62, 0.035, '#24352f');
+    lamp.position.set(x, 1.74, 1.26);
     machine.add(lamp);
     resultLamps.push(lamp);
   }
-  const header = box(2.55, 0.40, 0.35, '#30463d');
-  header.position.set(0, 3.31, 0.68);
-  machine.add(header);
   signFrame = box(2.28, 0.62, 0.045, '#24352f');
-  signFrame.position.set(0, 0.71, 0.864);
+  signFrame.position.set(0, 0.71, 1.26);
   machine.add(signFrame);
-  machineLabel = label('BLICKET', 2.12, 0.46, 0, 0.71, 0.893, '#253b32', '#f3eddd');
+  machineLabel = label('BLICKET', 2.12, 0.46, 0, 0.71, 1.29, '#253b32', '#f3eddd');
   machine.add(machineLabel);
   labelLight = new THREE.PointLight('#ffd178', 0, 1.8);
-  labelLight.position.set(0, 0.71, 1.02);
+  labelLight.position.set(0, 0.71, 1.45);
   machine.add(labelLight);
   scanBeam = new THREE.Group();
   for (const x of [-1.02, 1.02]) {
@@ -271,7 +265,7 @@ function buildScene() {
     ray.rotation.z = Math.PI / 2;
     scanBeam.add(ray);
   }
-  scanBeam.position.set(0, 1.37, 0.18);
+  scanBeam.position.set(0, 2.32, 0.18);
   scanBeam.visible = false;
   machine.add(scanBeam);
   scanBounce = new THREE.Group();
@@ -298,7 +292,7 @@ function buildScene() {
   scanBounce.add(bouncedLight);
   machine.add(scanBounce);
   scanFloodLight = new THREE.PointLight('#82fff1', 0, 2.5);
-  scanFloodLight.position.set(0, 1.65, 0.75);
+  scanFloodLight.position.set(0, 2.60, 0.75);
   machine.add(scanFloodLight);
   scene.add(machine);
 
@@ -878,7 +872,7 @@ function animate(time) {
   }
 
   if (shaking) {
-    if (time - lastRattleAt > 130) {
+    if (time - lastRattleAt > 450) {
       sounds.play('rattle');
       lastRattleAt = time;
     }
