@@ -7,7 +7,7 @@ The current source of truth is `scenario.json` plus `game.js`. This is the minim
 | Stage | Prompt and 3D action | Visible result | Logged event |
 | --- | --- | --- | --- |
 | Language | Choose English or German, then Begin/Start | All game text and narration use the selected language | Session JSON stores `language` |
-| Start | Begin the game | One bucket carrying three objects moves onto the table; objects rattle and collide inside it | `bucket_arrival_started`, `bucket_arrived` |
+| Start | Begin the game | A deep bucket carrying three gray objects moves onto the table, then shakes for 1.45 seconds while the objects rattle and collide before the first object rises | `bucket_arrival_started`, `bucket_arrived`, `bucket_mixing_started`, `bucket_mixed` |
 | Each trial | The current object rises from the bucket; put it on the detector by drag, or select it then click the platform | The platform sinks into an open well until the object's center reaches the rim; a neutral cyan ray sweeps across its visible half during the 1,500 ms check | `trial_started`, `object_picked_up`, `platform_contact_detected` |
 | Outcome | Watch the detector | The platform, side lamps and large BLICKET sign frame blink gold and play a short tune for a hidden blicket; they blink red without an activation tune otherwise | `detector_outcome` |
 | Next | Advance after each outcome | The tested object visibly moves onto the table beside the detector before the next object rises from the bucket or the final prompt opens | `object_return_started`, `object_returned_to_table`, next `trial_started` |

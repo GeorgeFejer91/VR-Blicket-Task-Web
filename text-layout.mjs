@@ -3,7 +3,7 @@ import { prepareWithSegments, measureLineStats, measureNaturalWidth } from './ve
 // Grow text regions without shrinking user-selected type sizes.
 export async function sizeTextRegions(root) {
   await document.fonts.ready;
-  const regions = [...root.querySelectorAll('h1, h2, p, #progress, #feedback, button')];
+  const regions = [...root.querySelectorAll('h1, h2, h3, p, #progress, #feedback, button')];
   const cache = new WeakMap();
   let scheduled = false;
   function measure() {

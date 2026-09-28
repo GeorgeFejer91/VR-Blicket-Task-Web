@@ -1,7 +1,7 @@
 import * as THREE from './vendor/three.module.min.js';
 import { stepBucketBodies } from './bucket-physics.mjs';
 import { createSounds } from './sounds.mjs';
-import { sizeTextRegions } from './text-layout.mjs';
+import { sizeTextRegions } from './text-layout.mjs?v=20260928c';
 import { copy, objectName } from './copy.mjs';
 import { createNarration } from './narration.mjs';
 

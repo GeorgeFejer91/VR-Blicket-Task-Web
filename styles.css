@@ -93,6 +93,11 @@ h2 { font-size: clamp(19px, 2.5vw, 27px); line-height: 1.25; letter-spacing: -.0
   .actions button { width: 100%; }
 }
 
+@media (max-width: 360px) {
+  #progress { flex: 1 0 100%; margin-right: 0; }
+  .topbar-right { justify-content: flex-start; }
+}
+
 @media (orientation: landscape) and (max-height: 500px) {
   .topbar { min-height: 52px; }
   .subtitle { display: none; }

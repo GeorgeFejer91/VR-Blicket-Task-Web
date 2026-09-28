@@ -15,6 +15,7 @@ A public PC browser game lets players discover which object activates a detector
 | `scenario.json` | Three gray stimuli and hidden outcomes |
 | `bucket-physics.mjs` | Bounded collisions |
 | `sounds.mjs` | Synthesized bucket/handling effects, activation tune, mute control |
+| `text-layout.mjs` | Measured text sizing for narrow and translated controls |
 | `narration.mjs`, `audio/` | English/German narration playback, cue inventory and MP3 assets |
 | `copy.mjs` | English/German on-screen text |
 | `tests/bucket-physics.test.mjs` | Containment and separation checks |
@@ -25,6 +26,8 @@ A public PC browser game lets players discover which object activates a detector
 | `For-AI/` | Current agent guidance, gates, and decisions |
 
 One bucket carries a cube, cylinder, and rectangular block. All use matte `#808080`; each is tested once. Contact lowers the platform into the detector and a neutral ray scans the object; gold then indicates activation and red non-activation. The cube is the demo cause. Players pick one object with a lower-middle 2D button, then judge each with 2D buttons. The complete local JSON downloads automatically after the final answer, with no download button. Shape, size, order, and response position are not counterbalanced.
+
+The bucket is a deep open pail. After arriving, it visibly shakes for 1.45 seconds while the three objects collide and rattle inside; the first trial begins only after mixing. The same loop adapts to phone portrait and landscape through viewport dimensions, scene resize, coarse-pointer hit tolerance, safe-area spacing, and measured text reflow. Device behavior follows available screen and input capabilities rather than user-agent names.
 
 The detector has a dark green body and broad red platform based on [original video references](machine-references.md). Its taller open frame carries a larger BLICKET sign. The platform sinks until half of the tested object enters the well, then a cyan ray scans its exposed face. The sign frame and side lamps illuminate only at the outcome. Synthesized handling effects accompany bucket arrival and object placement; only activation plays the detector tune. Sound on/off controls effects and narration. Next carries each tested object onto the adjacent table before advancing and logs `object_returned_to_table`. All objects remain visible through final judgments and completion; a neutral ring marks the current judgment subject. Hidden outcomes remain scenario data, independent of appearance. German wording is provisional and not validated with participants.
 
