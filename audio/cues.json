@@ -1,0 +1,40 @@
+{
+  "schema": "blicket.audio-cues.v1",
+  "voice": {
+    "engine": "qwen",
+    "model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+    "reference": "Alba MacKenna, Kyutai tts-voices, CC BY 4.0",
+    "referenceUrl": "https://huggingface.co/kyutai/tts-voices/blob/main/alba-mackenna/casual.wav",
+    "referenceSha256": "1f835e49bf0f5e21cfe0131821be17c63193a2a2df3de19921605e3f733fa972"
+  },
+  "narration": [
+    { "id": "intro", "triggerId": "language_selected", "text": { "en": "Find out which object makes the detector go. Press Begin when you are ready.", "de": "Finde heraus, welches Objekt die Maschine anschaltet. Wenn du bereit bist, drücke auf Start." }, "files": { "en": "en/intro.mp3", "de": "de/intro.mp3" } },
+    { "id": "arrival", "triggerId": "bucket_arrival_started", "text": { "en": "A bucket with three objects is coming onto the table.", "de": "Ein Eimer mit drei Objekten kommt auf den Tisch." }, "files": { "en": "en/arrival.mp3", "de": "de/arrival.mp3" } },
+    { "id": "mixing", "triggerId": "bucket_mixing_started", "text": { "en": "The objects are mixing in the bucket.", "de": "Die Objekte mischen sich im Eimer." }, "files": { "en": "en/mixing.mp3", "de": "de/mixing.mp3" } },
+    { "id": "trial_cube", "triggerId": "trial_started:obj_cube", "text": { "en": "Put the cube on the detector and watch what happens.", "de": "Lege den Würfel auf die Maschine und beobachte, was passiert." }, "files": { "en": "en/trial_cube.mp3", "de": "de/trial_cube.mp3" } },
+    { "id": "trial_column", "triggerId": "trial_started:obj_column", "text": { "en": "Put the cylinder on the detector and watch what happens.", "de": "Lege den Zylinder auf die Maschine und beobachte, was passiert." }, "files": { "en": "en/trial_column.mp3", "de": "de/trial_column.mp3" } },
+    { "id": "trial_block", "triggerId": "trial_started:obj_block", "text": { "en": "Put the rectangular block on the detector and watch what happens.", "de": "Lege den rechteckigen Quader auf die Maschine und beobachte, was passiert." }, "files": { "en": "en/trial_block.mp3", "de": "de/trial_block.mp3" } },
+    { "id": "picked_up", "triggerId": "object_picked_up", "text": { "en": "Place it on the detector platform.", "de": "Lege es auf die Plattform der Maschine." }, "files": { "en": "en/picked_up.mp3", "de": "de/picked_up.mp3" } },
+    { "id": "checking", "triggerId": "platform_contact_detected", "text": { "en": "The detector is checking the object.", "de": "Die Maschine untersucht das Objekt." }, "files": { "en": "en/checking.mp3", "de": "de/checking.mp3" } },
+    { "id": "activated", "triggerId": "detector_outcome:true", "text": { "en": "The machine went! This object made it light up.", "de": "Die Maschine geht an! Dieses Objekt hat sie zum Leuchten gebracht." }, "files": { "en": "en/activated.mp3", "de": "de/activated.mp3" } },
+    { "id": "inactive", "triggerId": "detector_outcome:false", "text": { "en": "The machine stayed off. This object did not make it light up.", "de": "Die Maschine blieb aus. Dieses Objekt hat sie nicht zum Leuchten gebracht." }, "files": { "en": "en/inactive.mp3", "de": "de/inactive.mp3" } },
+    { "id": "returning", "triggerId": "object_return_started", "text": { "en": "The tested object is going back onto the table.", "de": "Das geprüfte Objekt kommt zurück auf den Tisch." }, "files": { "en": "en/returning.mp3", "de": "de/returning.mp3" } },
+    { "id": "point", "triggerId": "final_point_prompt_opened", "text": { "en": "Which object do you think is the Blicket? Choose one below.", "de": "Welches Objekt ist deiner Meinung nach ein Blicket? Wähle unten eines aus." }, "files": { "en": "en/point.mp3", "de": "de/point.mp3" } },
+    { "id": "judge_cube", "triggerId": "final_sequential_prompt_opened:obj_cube", "text": { "en": "Is the cube a Blicket? Choose Blicket or Not a Blicket.", "de": "Ist der Würfel ein Blicket? Wähle Blicket oder kein Blicket." }, "files": { "en": "en/judge_cube.mp3", "de": "de/judge_cube.mp3" } },
+    { "id": "judge_column", "triggerId": "final_sequential_prompt_opened:obj_column", "text": { "en": "Is the cylinder a Blicket? Choose Blicket or Not a Blicket.", "de": "Ist der Zylinder ein Blicket? Wähle Blicket oder kein Blicket." }, "files": { "en": "en/judge_column.mp3", "de": "de/judge_column.mp3" } },
+    { "id": "judge_block", "triggerId": "final_sequential_prompt_opened:obj_block", "text": { "en": "Is the rectangular block a Blicket? Choose Blicket or Not a Blicket.", "de": "Ist der rechteckige Quader ein Blicket? Wähle Blicket oder kein Blicket." }, "files": { "en": "en/judge_block.mp3", "de": "de/judge_block.mp3" } },
+    { "id": "complete", "triggerId": "session_completed", "text": { "en": "All done. Thank you for playing.", "de": "Fertig. Danke, dass du mitgespielt hast." }, "files": { "en": "en/complete.mp3", "de": "de/complete.mp3" } }
+  ],
+  "effects": [
+    { "id": "rattle", "triggerId": "bucket_arrival_started / bucket_mixing_started" },
+    { "id": "land", "triggerId": "bucket_arrived" },
+    { "id": "pickup", "triggerId": "object_picked_up" },
+    { "id": "place", "triggerId": "platform_contact_detected" },
+    { "id": "press", "triggerId": "platform_contact_detected" },
+    { "id": "activate", "triggerId": "detector_outcome:true" },
+    { "id": "return", "triggerId": "object_returned_to_table" },
+    { "id": "choice", "triggerId": "final_point_choice_submitted / final_sequential_choice_submitted" },
+    { "id": "complete", "triggerId": "session_completed" }
+  ],
+  "effectsSource": "web/sounds.mjs; synthesized at runtime; shared by English and German; no audio file"
+}

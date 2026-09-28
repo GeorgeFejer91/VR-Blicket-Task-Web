@@ -1,14 +1,19 @@
 import * as THREE from './vendor/three.module.min.js';
 import { stepBucketBodies } from './bucket-physics.mjs';
 import { createSounds } from './sounds.mjs';
+import { sizeTextRegions } from './text-layout.mjs';
+import { copy, objectName } from './copy.mjs';
+import { createNarration } from './narration.mjs';
 
 const ui = Object.fromEntries(
-  ['scene', 'prompt', 'detail', 'progress', 'feedback', 'begin', 'next', 'restart', 'sound']
+  ['scene', 'prompt', 'detail', 'progress', 'feedback', 'begin', 'next', 'restart', 'sound',
+    'subtitle', 'language-menu', 'language-title', 'language-detail', 'language-en', 'language-de',
+    'quiz', 'answer-cube', 'answer-column', 'answer-block', 'answer-yes', 'answer-no']
     .map((id) => [id, document.getElementById(id)]),
 );
 
 const BUCKET_HOME = new THREE.Vector3(-2.25, 0, 0.2);
-const START = new THREE.Vector3(-2.25, 1.55, 0.2);
+const START = new THREE.Vector3(-2.25, 2.18, 0.2);
 const DETECTOR = new THREE.Vector3(1.55, 0, -0.45);
 const PLATFORM_TOP = 0.96;
 const PLATFORM_Y = 0.87;
@@ -17,8 +22,13 @@ const PLATFORM_HALF_Z = 0.72;
 const TABLE_TOP = -0.09;
 const RETURN_SECONDS = 0.65;
 const sounds = createSounds();
+let narration;
+let language = 'en';
+const t = (key, values) => copy(language, key, values);
+const nameOf = (id) => objectName(id, language);
 const BUCKET_ENTRY_X = -6.6;
 const ARRIVAL_SECONDS = 1.8;
+const MIX_SECONDS = 1.45;
 const LIFT_SECONDS = 0.55;
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
@@ -35,7 +45,6 @@ let scene;
 let machine;
 let bucket;
 let platform;
-let choicePads;
 let judgmentMarker;
 let currentObject;
 let stage = 'intro';
@@ -55,6 +64,9 @@ let returnElapsed = 0;
 let returnFrom;
 let returnTo;
 let lastRattleAt = 0;
+let mixElapsed = 0;
+let touchInput = false;
+let reducedMotion = false;
 
 boot().catch((error) => {
   ui.prompt.textContent = 'The game could not load.';
@@ -65,9 +77,13 @@ boot().catch((error) => {
 });
 
 async function boot() {
-  const response = await fetch('./scenario.json', { cache: 'no-store' });
-  if (!response.ok) throw new Error(`Scenario request failed: ${response.status}`);
+  const [response, audioResponse] = await Promise.all([
+    fetch('./scenario.json', { cache: 'no-store' }),
+    fetch('./audio/cues.json', { cache: 'no-store' }),
+  ]);
+  if (!response.ok || !audioResponse.ok) throw new Error('Game data could not load.');
   scenario = await response.json();
+  narration = createNarration(await audioResponse.json(), (active) => sounds.setVoiceActive(active));
   if (scenario.ruleType !== 'deterministic_hidden_object' || scenario.trialOrder.length !== 3 ||
       scenario.buckets.length !== 1 || scenario.buckets[0].objectIds.length !== 3) {
     throw new Error('This game needs one bucket with three deterministic trial objects.');
@@ -75,23 +91,77 @@ async function boot() {
 
   buildScene();
   renderIntro();
-  ui.begin.disabled = false;
-  ui.begin.textContent = 'Begin';
+  ui.begin.textContent = t('begin');
   ui.begin.addEventListener('click', start);
+  for (const code of ['en', 'de']) {
+    ui[`language-${code}`].addEventListener('click', () => {
+      language = code;
+      document.documentElement.lang = code;
+      narration.setLanguage(code);
+      applyLanguage();
+      ui.begin.disabled = false;
+      ui.begin.focus({ preventScroll: true });
+      narration.play('intro');
+    });
+  }
+  for (const id of scenario.finalPrompt.pointObjectIds) {
+    const button = ui[`answer-${id.split('_')[1]}`];
+    button.addEventListener('click', () => { if (stage === 'point') submitPoint(id); });
+  }
+  ui['answer-yes'].addEventListener('click', () => { if (stage === 'judge') submitJudgment(true); });
+  ui['answer-no'].addEventListener('click', () => { if (stage === 'judge') submitJudgment(false); });
   ui.next.addEventListener('click', advance);
   ui.restart.addEventListener('click', start);
   ui.sound.addEventListener('click', () => {
     const enabled = sounds.toggle();
-    ui.sound.textContent = enabled ? 'Sound on' : 'Sound off';
+    narration.setEnabled(enabled);
+    ui.sound.textContent = t(enabled ? 'soundOn' : 'soundOff');
     ui.sound.setAttribute('aria-pressed', String(enabled));
   });
   renderer.domElement.addEventListener('pointerdown', onPointerDown);
   renderer.domElement.addEventListener('pointermove', onPointerMove);
   renderer.domElement.addEventListener('pointerup', onPointerUp);
-  renderer.domElement.addEventListener('pointercancel', onPointerUp);
+  renderer.domElement.addEventListener('pointercancel', onPointerCancel);
   window.addEventListener('resize', resize);
+  const coarsePointer = window.matchMedia('(any-pointer: coarse)');
+  const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const updatePreferences = () => {
+    touchInput = coarsePointer.matches;
+    reducedMotion = motionPreference.matches;
+  };
+  coarsePointer.addEventListener('change', updatePreferences);
+  motionPreference.addEventListener('change', updatePreferences);
+  updatePreferences();
+  new ResizeObserver(resize).observe(ui.scene);
+  sizeTextRegions(document.querySelector('.app'));
   resize();
   renderer.setAnimationLoop(animate);
+}
+
+function applyLanguage() {
+  ui.subtitle.textContent = t('subtitle');
+  ui['language-title'].textContent = t('languageTitle');
+  ui['language-detail'].textContent = t('languageDetail');
+  ui.begin.textContent = t('begin');
+  ui.restart.textContent = t('restart');
+  ui.sound.textContent = t(ui.sound.getAttribute('aria-pressed') === 'false' ? 'soundOff' : 'soundOn');
+  ui.scene.setAttribute('aria-label', t('sceneLabel'));
+  ui.quiz.setAttribute('aria-label', t('quizLabel'));
+  for (const code of ['en', 'de']) ui[`language-${code}`].setAttribute('aria-pressed', String(code === language));
+  for (const id of scenario.finalPrompt.pointObjectIds) {
+    ui[`answer-${id.split('_')[1]}`].textContent = nameOf(id).replace(/^./, (letter) => letter.toUpperCase());
+  }
+  ui['answer-yes'].textContent = t('blicket');
+  ui['answer-no'].textContent = t('notBlicket');
+  renderIntro();
+}
+
+function setQuiz(mode) {
+  ui.quiz.hidden = mode === null;
+  for (const id of scenario.finalPrompt.pointObjectIds) ui[`answer-${id.split('_')[1]}`].hidden = mode !== 'point';
+  ui['answer-yes'].hidden = mode !== 'judge';
+  ui['answer-no'].hidden = mode !== 'judge';
+  if (mode) ui[mode === 'point' ? 'answer-cube' : 'answer-yes'].focus({ preventScroll: true });
 }
 
 function buildScene() {
@@ -150,21 +220,21 @@ function buildScene() {
   bucket = new THREE.Group();
   bucket.position.copy(BUCKET_HOME);
   const pail = new THREE.Mesh(
-    new THREE.CylinderGeometry(1.4, 1.26, 0.52, 40, 1, true),
+    new THREE.CylinderGeometry(1.48, 1.34, 1.5, 40, 1, true),
     new THREE.MeshStandardMaterial({ color: '#928273', side: THREE.DoubleSide, roughness: 0.9 }),
   );
-  pail.position.y = 0.29;
+  pail.position.y = 0.80;
   pail.castShadow = true;
   bucket.add(pail);
   const rim = new THREE.Mesh(
-    new THREE.TorusGeometry(1.4, 0.07, 8, 40),
+    new THREE.TorusGeometry(1.48, 0.07, 8, 40),
     new THREE.MeshStandardMaterial({ color: '#5c544a', roughness: 0.8 }),
   );
   rim.rotation.x = Math.PI / 2;
-  rim.position.y = 0.56;
+  rim.position.y = 1.56;
   bucket.add(rim);
   const bottom = new THREE.Mesh(
-    new THREE.CylinderGeometry(1.26, 1.26, 0.04, 40),
+    new THREE.CylinderGeometry(1.34, 1.34, 0.04, 40),
     new THREE.MeshStandardMaterial({ color: '#6a5e52', roughness: 0.8 }),
   );
   bottom.position.y = 0.035;
@@ -181,11 +251,6 @@ function buildScene() {
     scene.add(mesh);
   }
 
-  choicePads = new THREE.Group();
-  choicePads.add(choicePad('blicket', 1.25, '#7a5a32', 'BLICKET'));
-  choicePads.add(choicePad('not_blicket', 2.35, '#5b5a55', 'NOT A BLICKET'));
-  choicePads.visible = false;
-  scene.add(choicePads);
   judgmentMarker = new THREE.Mesh(
     new THREE.TorusGeometry(0.62, 0.026, 8, 48),
     new THREE.MeshBasicMaterial({ color: '#302e28' }),
@@ -242,20 +307,6 @@ function makeObject(spec) {
   return mesh;
 }
 
-function choicePad(action, z, color, text) {
-  const group = new THREE.Group();
-  group.position.set(-2.1, TABLE_TOP, z);
-  const pad = box(2.35, 0.22, 0.78, color);
-  pad.position.y = 0.13;
-  pad.userData.action = action;
-  pickMeshes.push(pad);
-  group.add(pad);
-  const caption = label(text, 2.18, 0.28, 0, 0.255, 0.405, '#fffaf0', color);
-  caption.rotation.x = -0.4;
-  group.add(caption);
-  return group;
-}
-
 function renderIntro() {
   stage = 'intro';
   machine.visible = true;
@@ -263,19 +314,21 @@ function renderIntro() {
   bucket.visible = true;
   bucket.position.copy(BUCKET_HOME);
   bucket.rotation.set(0, 0, 0);
-  choicePads.visible = false;
+  ui['language-menu'].hidden = false;
+  setQuiz(null);
   for (const object of objects.values()) object.visible = false;
   setDetector(null);
-  ui.progress.textContent = 'Ready to begin';
-  ui.prompt.textContent = 'Find out which object makes the detector go.';
-  ui.detail.textContent = 'Put each object on the 3D detector, watch what happens, then make your choices.';
-  ui.feedback.textContent = 'Click Begin to start.';
+  ui.progress.textContent = t('ready');
+  ui.prompt.textContent = t('introPrompt');
+  ui.detail.textContent = t('introDetail');
+  ui.feedback.textContent = t('introFeedback');
   ui.begin.hidden = false;
   ui.next.hidden = true;
 }
 
 function start() {
   sounds.stop();
+  narration?.stop();
   sounds.unlock();
   for (const timer of pendingTimers) clearTimeout(timer);
   pendingTimers.clear();
@@ -283,6 +336,7 @@ function start() {
     schema: 'vr_blicket_task.web_session.v1',
     sessionId: crypto.randomUUID(),
     scenarioId: scenario.scenarioId,
+    language,
     startedAt: new Date().toISOString(),
     trials: [],
     events: [],
@@ -301,7 +355,8 @@ function start() {
   bucket.visible = true;
   bucket.position.set(BUCKET_ENTRY_X, 0, BUCKET_HOME.z);
   bucket.rotation.set(0, 0, 0);
-  choicePads.visible = false;
+  ui['language-menu'].hidden = true;
+  setQuiz(null);
   judgmentMarker.visible = false;
   platform.position.y = PLATFORM_Y;
   setDetector(null);
@@ -316,17 +371,20 @@ function start() {
     mesh.rotation.set(0, 0, 0);
     const [x, z] = positions[index];
     const radius = mesh.userData.bucketRadius;
-    bucketBodies.push({ id, mesh, x, z, vx: 0, vz: 0, radius });
+    bucketBodies.push({ id, mesh, x, z, vx: (Math.random() - 0.5) * 2,
+      vz: (Math.random() - 0.5) * 2, phase: Math.random() * Math.PI * 2, radius });
     mesh.position.set(x, 0.065 + objectHalfHeight(mesh), z);
   });
   arrivalElapsed = 0;
+  mixElapsed = 0;
   lastRattleAt = 0;
   stage = 'arrival';
-  ui.progress.textContent = 'Bucket arriving';
-  ui.prompt.textContent = 'Watch the bucket come onto the table.';
-  ui.detail.textContent = 'Three objects are moving inside it.';
-  ui.feedback.textContent = 'The objects are rattling together.';
+  ui.progress.textContent = t('bucketArriving');
+  ui.prompt.textContent = t('arrivalPrompt');
+  ui.detail.textContent = t('arrivalDetail');
+  ui.feedback.textContent = t('arrivalFeedback');
   log('bucket_arrival_started', { bucketId: scenario.buckets[0].id, objectIds: scenario.buckets[0].objectIds });
+  narration?.play('arrival');
 }
 
 function showTrial() {
@@ -342,12 +400,11 @@ function showTrial() {
   currentObject.rotation.set(0, 0, 0);
   bucket.visible = true;
   machine.visible = true;
-  choicePads.visible = false;
   setDetector(null);
-  ui.progress.textContent = `Object ${trialIndex + 1} of ${scenario.trialOrder.length}`;
-  ui.prompt.textContent = `Here is the ${spec.label.toLowerCase()}.`;
-  ui.detail.textContent = 'Watch it come out of the bucket.';
-  ui.feedback.textContent = 'Getting the object ready.';
+  ui.progress.textContent = t('objectProgress', { index: trialIndex + 1, total: scenario.trialOrder.length });
+  ui.prompt.textContent = t('showPrompt', { object: nameOf(spec.id) });
+  ui.detail.textContent = t('showDetail');
+  ui.feedback.textContent = t('showFeedback');
   ui.next.hidden = true;
 }
 
@@ -355,10 +412,11 @@ function readyTrial() {
   const trial = activeTrial();
   const spec = scenario.objects.find((object) => object.id === trial.objectId);
   stage = 'ready';
-  ui.prompt.textContent = `Put the ${spec.label.toLowerCase()} on the blicket detector.`;
-  ui.detail.textContent = 'Drag the 3D object onto the platform, or click the object and then click the platform.';
-  ui.feedback.textContent = `${spec.label} is ready to test.`;
+  ui.prompt.textContent = t('readyPrompt', { object: nameOf(spec.id) });
+  ui.detail.textContent = t('readyDetail');
+  ui.feedback.textContent = t('readyFeedback', { object: nameOf(spec.id) });
   log('trial_started', { trialId: trial.trialId, objectId: spec.id });
+  narration?.play(`trial_${spec.id.split('_')[1]}`, true);
 }
 
 function setDetector(outcome, lit = true) {
@@ -371,7 +429,7 @@ function setDetector(outcome, lit = true) {
 }
 
 function onPointerDown(event) {
-  if (event.button !== 0) return;
+  if (event.button !== 0 || event.isPrimary === false) return;
   const target = pick(event);
   if (!target) return;
   if (stage === 'ready' && target.objectId === currentObject?.userData.objectId) {
@@ -380,27 +438,22 @@ function onPointerDown(event) {
     draggedObject = false;
     renderer.domElement.setPointerCapture(event.pointerId);
     currentObject.position.y = START.y + 0.16;
-    ui.prompt.textContent = 'Place the object on the detector platform.';
-    ui.detail.textContent = 'Release it over the platform, or click the platform to place it.';
-    ui.feedback.textContent = 'Object selected.';
+    ui.prompt.textContent = t('heldPrompt');
+    ui.detail.textContent = t('heldDetail');
+    ui.feedback.textContent = t('heldFeedback');
     sounds.play('pickup');
     log('object_picked_up', { trialId: activeTrial().trialId, objectId: currentObject.userData.objectId });
+    narration?.play('picked_up');
     return;
   }
   if (stage === 'held' && target.action === 'platform') {
     placeObject();
     return;
   }
-  if (stage === 'point' && target.objectId) {
-    submitPoint(target.objectId);
-    return;
-  }
-  if (stage === 'judge' && (target.action === 'blicket' || target.action === 'not_blicket')) {
-    submitJudgment(target.action === 'blicket');
-  }
 }
 
 function onPointerMove(event) {
+  if (event.isPrimary === false) return;
   const target = pick(event);
   renderer.domElement.style.cursor = target && clickable(target) ? 'pointer' : 'default';
   if (!pointerHeld || stage !== 'held') return;
@@ -414,7 +467,7 @@ function onPointerMove(event) {
 }
 
 function onPointerUp(event) {
-  if (!pointerHeld) return;
+  if (!pointerHeld || event.isPrimary === false) return;
   pointerHeld = false;
   if (renderer.domElement.hasPointerCapture(event.pointerId)) {
     renderer.domElement.releasePointerCapture(event.pointerId);
@@ -428,12 +481,20 @@ function onPointerUp(event) {
   }
 }
 
+function onPointerCancel(event) {
+  if (!pointerHeld || event.isPrimary === false) return;
+  pointerHeld = false;
+  draggedObject = false;
+  if (renderer.domElement.hasPointerCapture(event.pointerId)) {
+    renderer.domElement.releasePointerCapture(event.pointerId);
+  }
+  if (stage === 'held') currentObject.position.copy(START);
+}
+
 function clickable(target) {
   if (stage === 'ready' || stage === 'held') {
     return target.objectId === currentObject?.userData.objectId || (stage === 'held' && target.action === 'platform');
   }
-  if (stage === 'point') return Boolean(target.objectId);
-  if (stage === 'judge') return target.action === 'blicket' || target.action === 'not_blicket';
   return false;
 }
 
@@ -444,13 +505,27 @@ function pick(event) {
     -((event.clientY - bounds.top) / bounds.height) * 2 + 1,
   );
   raycaster.setFromCamera(pointer, camera);
-  return raycaster.intersectObjects(pickMeshes, false)
-    .find((hit) => {
-      for (let node = hit.object; node; node = node.parent) {
-        if (!node.visible) return false;
-      }
-      return true;
-    })?.object.userData;
+  const visible = (mesh) => {
+    for (let node = mesh; node; node = node.parent) if (!node.visible) return false;
+    return true;
+  };
+  const hit = raycaster.intersectObjects(pickMeshes, false)
+    .find(({ object }) => visible(object) && clickable(object.userData));
+  if (hit) return hit.object.userData;
+  if (!touchInput && event.pointerType !== 'touch') return;
+  // A finger can land just outside a small projected object on a narrow screen.
+  let nearest;
+  let distance = 28;
+  for (const mesh of pickMeshes) {
+    if (!visible(mesh) || !clickable(mesh.userData)) continue;
+    const projected = mesh.getWorldPosition(new THREE.Vector3()).project(camera);
+    if (projected.z < -1 || projected.z > 1) continue;
+    const x = bounds.left + (projected.x + 1) * bounds.width / 2;
+    const y = bounds.top + (1 - projected.y) * bounds.height / 2;
+    const candidate = Math.hypot(event.clientX - x, event.clientY - y);
+    if (candidate < distance) { distance = candidate; nearest = mesh.userData; }
+  }
+  return nearest;
 }
 
 function pointOnPlane(event) {
@@ -490,12 +565,13 @@ function placeObject() {
   outcomeActivated = null;
   setDetector(null);
   currentObject.position.set(DETECTOR.x, PLATFORM_TOP + objectHalfHeight(currentObject), DETECTOR.z);
-  ui.prompt.textContent = 'The detector is checking the object…';
-  ui.detail.textContent = 'Watch the detector platform.';
-  ui.feedback.textContent = 'Checking…';
+  ui.prompt.textContent = t('checkingPrompt');
+  ui.detail.textContent = t('checkingDetail');
+  ui.feedback.textContent = t('checkingFeedback');
   sounds.play('place');
   sounds.play('press');
   log('platform_contact_detected', { trialId: trial.trialId, objectId: trial.objectId });
+  narration?.play('checking');
   const timer = setTimeout(() => {
     pendingTimers.delete(timer);
     showOutcome();
@@ -513,15 +589,14 @@ function showOutcome() {
   outcomeAt = performance.now();
   setDetector(activated);
   if (activated) sounds.play('activate');
-  ui.prompt.textContent = activated ? 'The machine went!' : 'The machine stayed off.';
-  ui.detail.textContent = activated
-    ? `${spec.label} made the detector light up.`
-    : `${spec.label} did not make the detector light up.`;
-  ui.feedback.textContent = activated ? 'Detector activated.' : 'No activation.';
+  ui.prompt.textContent = t(activated ? 'activePrompt' : 'inactivePrompt');
+  ui.detail.textContent = t(activated ? 'activeDetail' : 'inactiveDetail', { object: nameOf(spec.id) });
+  ui.feedback.textContent = t(activated ? 'activeFeedback' : 'inactiveFeedback');
   ui.next.hidden = false;
-  ui.next.textContent = trialIndex + 1 < scenario.trialOrder.length ? 'Next object' : 'Make your choices';
+  ui.next.textContent = t(trialIndex + 1 < scenario.trialOrder.length ? 'next' : 'choices');
   session.trials.push({ trialId: trial.trialId, objectId: trial.objectId, activated });
   log('detector_outcome', { trialId: trial.trialId, objectId: trial.objectId, activated });
+  narration?.play(activated ? 'activated' : 'inactive', true);
 }
 
 function advance() {
@@ -533,8 +608,10 @@ function advance() {
   returnTo = tablePosition(currentObject);
   setDetector(null);
   ui.next.hidden = true;
-  ui.detail.textContent = 'The tested object goes onto the table beside the machine.';
-  ui.feedback.textContent = 'Putting the object on the table.';
+  ui.detail.textContent = t('returningDetail');
+  ui.feedback.textContent = t('returningFeedback');
+  log('object_return_started', { trialId: activeTrial().trialId, objectId: currentObject.userData.objectId });
+  narration?.play('returning');
 }
 
 function tablePosition(object) {
@@ -556,13 +633,14 @@ function showPointChoice() {
   currentObject = null;
   bucket.visible = true;
   machine.visible = true;
-  choicePads.visible = false;
-  ui.progress.textContent = 'Your choice';
-  ui.prompt.textContent = scenario.finalPrompt.pointPrompt;
-  ui.detail.textContent = 'Click one of the three objects on the table beside the machine.';
-  ui.feedback.textContent = 'Choose the object you think made the machine go.';
+  setQuiz('point');
+  ui.progress.textContent = t('pointProgress');
+  ui.prompt.textContent = t('pointPrompt');
+  ui.detail.textContent = t('pointDetail');
+  ui.feedback.textContent = t('pointFeedback');
   ui.next.hidden = true;
   log('final_point_prompt_opened', {});
+  narration?.play('point', true);
 }
 
 function submitPoint(objectId) {
@@ -582,12 +660,13 @@ function showJudgment() {
   judgmentMarker.position.copy(object.position);
   judgmentMarker.position.y = TABLE_TOP + 0.03;
   judgmentMarker.visible = true;
-  choicePads.visible = true;
-  ui.progress.textContent = `Question ${judgmentIndex + 1} of ${scenario.finalPrompt.sequentialObjectIds.length}`;
-  ui.prompt.textContent = `Is the ${spec.label.toLowerCase()} a blicket?`;
-  ui.detail.textContent = 'Look at the object with the ring, then click one of the two answer pads.';
-  ui.feedback.textContent = 'Make your judgment.';
+  setQuiz('judge');
+  ui.progress.textContent = t('questionProgress', { index: judgmentIndex + 1, total: scenario.finalPrompt.sequentialObjectIds.length });
+  ui.prompt.textContent = t('judgePrompt', { object: nameOf(spec.id) });
+  ui.detail.textContent = t('judgeDetail');
+  ui.feedback.textContent = t('judgeFeedback');
   log('final_sequential_prompt_opened', { objectId });
+  narration?.play(`judge_${objectId.split('_')[1]}`);
 }
 
 function submitJudgment(saysBlicket) {
@@ -603,7 +682,7 @@ function submitJudgment(saysBlicket) {
 function complete() {
   if (stage === 'complete') return;
   stage = 'complete';
-  choicePads.visible = false;
+  setQuiz(null);
   judgmentMarker.visible = false;
   machine.visible = true;
   bucket.visible = false;
@@ -611,10 +690,11 @@ function complete() {
   sounds.play('complete');
   session.completedAt = new Date().toISOString();
   log('session_completed', {});
-  ui.progress.textContent = 'Complete';
-  ui.prompt.textContent = 'All done.';
-  ui.detail.textContent = 'Your session JSON downloads automatically. Check your browser’s downloads.';
-  ui.feedback.textContent = 'Thank you for playing.';
+  ui.progress.textContent = t('completeProgress');
+  ui.prompt.textContent = t('completePrompt');
+  ui.detail.textContent = t('completeDetail');
+  ui.feedback.textContent = t('completeFeedback');
+  narration?.play('complete');
   downloadSession();
 }
 
@@ -639,7 +719,21 @@ function resize() {
   const height = ui.scene.clientHeight;
   if (!width || !height) return;
   camera.aspect = width / height;
+  // Fit the bucket, raised object, machine and table row at every aspect.
+  const target = new THREE.Vector3(0, 0.85, 0.25);
+  const direction = new THREE.Vector3(0, 5.6, 7.2).normalize();
+  const up = new THREE.Vector3().crossVectors(direction, new THREE.Vector3(1, 0, 0));
+  const tangent = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * 0.92;
+  let distance = 8.6;
+  for (const x of [-4, 4.1]) for (const y of [-0.1, 2.8]) for (const z of [-1.5, 3.6]) {
+    const corner = new THREE.Vector3(x, y, z).sub(target);
+    distance = Math.max(distance, corner.dot(direction) +
+      Math.max(Math.abs(corner.x) / (tangent * camera.aspect), Math.abs(corner.dot(up)) / tangent));
+  }
+  camera.position.copy(target).addScaledVector(direction, distance);
+  camera.lookAt(target);
   camera.updateProjectionMatrix();
+  camera.updateMatrixWorld();
   renderer.setSize(width, height, false);
 }
 
@@ -647,34 +741,61 @@ function animate(time) {
   const delta = Math.min((time - lastFrame) / 1000 || 0, 0.05);
   lastFrame = time;
 
+  const shaking = stage === 'arrival' || stage === 'mixing';
+  const motionScale = reducedMotion ? 0.18 : 1;
   if (bucket.visible && bucketBodies.length) {
-    stepBucketBodies(bucketBodies, delta, stage === 'arrival' ? 7 : 0, time / 1000);
+    stepBucketBodies(bucketBodies, delta, shaking ? 9 * motionScale : 0, time / 1000);
     bucketBodies.forEach((body, index) => {
-      const bounce = stage === 'arrival' ? Math.abs(Math.sin(time * 0.027 + index * 2)) * 0.07 : 0;
+      const phase = body.phase || index * 2;
+      const bounce = shaking ? Math.abs(Math.sin(time * 0.027 + phase)) * 0.09 * motionScale : 0;
       body.mesh.position.set(body.x, 0.065 + objectHalfHeight(body.mesh) + bounce, body.z);
+      body.mesh.rotation.set(shaking ? Math.sin(time * 0.017 + phase) * 0.05 * motionScale : 0,
+        0, shaking ? Math.cos(time * 0.021 + phase) * 0.05 * motionScale : 0);
     });
   }
 
-  if (stage === 'arrival') {
+  if (shaking) {
     if (time - lastRattleAt > 130) {
       sounds.play('rattle');
       lastRattleAt = time;
     }
+  }
+  if (stage === 'arrival') {
     arrivalElapsed += delta;
     const progress = Math.min(arrivalElapsed / ARRIVAL_SECONDS, 1);
     const eased = 1 - (1 - progress) ** 3;
     bucket.position.x = BUCKET_ENTRY_X + (BUCKET_HOME.x - BUCKET_ENTRY_X) * eased;
-    bucket.rotation.z = Math.sin(time * 0.023) * 0.035 * (1 - progress);
-    bucket.rotation.x = Math.sin(time * 0.018) * 0.018 * (1 - progress);
+    bucket.rotation.z = Math.sin(time * 0.023) * 0.05 * (1 - progress) * motionScale;
+    bucket.rotation.x = Math.sin(time * 0.018) * 0.035 * (1 - progress) * motionScale;
     if (progress === 1) {
       bucket.position.copy(BUCKET_HOME);
       bucket.rotation.set(0, 0, 0);
       sounds.play('land');
       log('bucket_arrived', { bucketId: scenario.buckets[0].id });
-      showTrial();
+      stage = 'mixing';
+      ui.progress.textContent = t('mixing');
+      ui.prompt.textContent = t('mixingPrompt');
+      ui.detail.textContent = t('mixingDetail');
+      log('bucket_mixing_started', { bucketId: scenario.buckets[0].id });
+      narration?.play('mixing', true);
     }
   }
 
+  if (stage === 'mixing') {
+    mixElapsed += delta;
+    const envelope = Math.max(0, Math.min(1, (MIX_SECONDS - mixElapsed) / 0.3)) * motionScale;
+    bucket.position.set(BUCKET_HOME.x + Math.sin(time * 0.025) * 0.09 * envelope,
+      Math.abs(Math.sin(time * 0.019)) * 0.045 * envelope,
+      BUCKET_HOME.z + Math.cos(time * 0.021) * 0.06 * envelope);
+    bucket.rotation.set(Math.sin(time * 0.021) * 0.065 * envelope, 0,
+      Math.cos(time * 0.025) * 0.075 * envelope);
+    if (mixElapsed >= MIX_SECONDS) {
+      bucket.position.copy(BUCKET_HOME);
+      bucket.rotation.set(0, 0, 0);
+      log('bucket_mixed', { bucketId: scenario.buckets[0].id });
+      showTrial();
+    }
+  }
   if (stage === 'presenting') {
     liftElapsed += delta;
     const progress = Math.min(liftElapsed / LIFT_SECONDS, 1);

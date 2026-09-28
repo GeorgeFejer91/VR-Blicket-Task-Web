@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import vm from 'node:vm';
 import * as THREE from '../vendor/three.module.min.js';
 import { stepBucketBodies } from '../bucket-physics.mjs';
+import { copy, objectName } from '../copy.mjs';
 
 test('objects persist and a complete session downloads once after the final judgment', async () => {
   const elements = new Map();
@@ -12,7 +13,7 @@ test('objects persist and a complete session downloads once after the final judg
   const downloads = [];
   let downloadBlob;
   const context = vm.createContext({
-    THREE, stepBucketBodies, console, performance, Blob, crypto: { randomUUID },
+    THREE, stepBucketBodies, copy, objectName, console, performance, Blob, crypto: { randomUUID },
     URL: { createObjectURL(blob) { downloadBlob = blob; return 'blob:session'; }, revokeObjectURL() {} },
     setTimeout: () => 1, clearTimeout() {},
     createSounds: () => ({ unlock() {}, stop() {}, play: (effect) => effects.push(effect) }),
@@ -20,7 +21,7 @@ test('objects persist and a complete session downloads once after the final judg
       assert.equal(tag, 'a');
       return { click() { downloads.push({ filename: this.download, blob: downloadBlob }); } };
     }, getElementById(id) {
-      if (!elements.has(id)) elements.set(id, { setAttribute() {} });
+      if (!elements.has(id)) elements.set(id, { setAttribute() {}, focus() {} });
       return elements.get(id);
     } },
   });
@@ -36,7 +37,6 @@ test('objects persist and a complete session downloads once after the final judg
     machine = new THREE.Group();
     bucket = new THREE.Group();
     platform = box(2.2, 0.18, 1.44, '#c9443c');
-    choicePads = new THREE.Group();
     judgmentMarker = new THREE.Group();
     scene.add(machine, bucket);
     renderer = { render() {} };
@@ -47,9 +47,16 @@ test('objects persist and a complete session downloads once after the final judg
       objects.set(spec.id, mesh);
     }
     start();
-    for (let time = 0; time <= 3000; time += 20) animate(time);
+    for (let time = 0; time <= 2100; time += 20) animate(time);
   `);
+  assert.equal(run('stage'), 'mixing');
+  assert.equal(run('session.language'), 'en');
+  assert.equal(run('session.trials.length'), 0);
+  assert.ok(run('bucket.rotation.x !== 0 || bucket.rotation.z !== 0'));
+  assert.equal(run('session.events.at(-1).type'), 'bucket_mixing_started');
+  run('for (let time = 2120; time <= 4400; time += 20) animate(time);');
   assert.equal(run('stage'), 'ready');
+  assert.equal(run('session.events.filter(event => event.type === "bucket_mixed").length'), 1);
   assert.equal(run('overPlatform(DETECTOR, currentObject)'), true);
   assert.equal(run('overPlatform(new THREE.Vector3(DETECTOR.x + 2, 0, DETECTOR.z), currentObject)'), false);
   for (let index = 0; index < 3; index += 1) {
@@ -76,7 +83,12 @@ test('objects persist and a complete session downloads once after the final judg
   }
   assert.equal(effects.filter((effect) => effect === 'activate').length, 1);
   assert.equal(run('session.events.filter(event => event.type === "object_returned_to_table").length'), 3);
+  assert.equal(elements.get('quiz').hidden, false);
+  assert.equal(elements.get('answer-cube').hidden, false);
+  assert.equal(elements.get('answer-yes').hidden, true);
   run('submitPoint(scenario.objects[0].id);');
+  assert.equal(elements.get('answer-cube').hidden, true);
+  assert.equal(elements.get('answer-yes').hidden, false);
   assert.equal(downloads.length, 0);
   for (let index = 0; index < 3; index += 1) {
     assert.equal(downloads.length, 0);
@@ -85,6 +97,7 @@ test('objects persist and a complete session downloads once after the final judg
     run(`submitJudgment(${index === 0});`);
   }
   assert.equal(run('stage'), 'complete');
+  assert.equal(elements.get('quiz').hidden, true);
   assert.equal(run('session.judgments.length'), 3);
   assert.equal(run('[...objects.values()].every(object => object.visible)'), true);
   assert.equal(downloads.length, 1);
@@ -105,12 +118,37 @@ test('objects persist and a complete session downloads once after the final judg
   assert.equal(run('[...objects.values()].every(object => object.visible && object.parent === bucket)'), true);
   assert.equal(run('judgmentMarker.visible'), false);
   run(`
-    for (let frame = 0; frame < 150; frame += 1) animate(lastFrame + 20);
+    for (let frame = 0; frame < 210; frame += 1) animate(lastFrame + 20);
     stage = 'held'; placeObject(); showOutcome(); advance();
     start();
-    for (let frame = 0; frame < 150; frame += 1) animate(lastFrame + 20);
+    for (let frame = 0; frame < 210; frame += 1) animate(lastFrame + 20);
   `);
   assert.equal(run('stage'), 'ready');
   assert.equal(run('trialIndex'), 0);
   assert.equal(run('session.trials.length'), 0);
+  run(`
+    renderer.domElement = { hasPointerCapture() { return false; } };
+    pointerHeld = true; stage = 'held'; currentObject.position.copy(DETECTOR);
+    onPointerCancel({ pointerId: 1, isPrimary: true });
+  `);
+  assert.equal(run('currentObject.position.distanceTo(START)'), 0);
+  assert.equal(run('session.events.some(event => event.type === "platform_contact_detected")'), false);
+  // Rotating/resizing a device must retain the whole interactive tabletop.
+  for (const [width, height] of [[296, 296], [366, 366], [820, 260], [1200, 468]]) {
+    context.testWidth = width;
+    context.testHeight = height;
+    run(`
+      ui.scene.clientWidth = testWidth; ui.scene.clientHeight = testHeight;
+      renderer.setSize = () => {};
+      camera = new THREE.PerspectiveCamera(37, 1, 0.1, 100);
+      resize();
+    `);
+    assert.ok(run(`[-4, 4.1].every(x => [-0.1, 2.8].every(y => [-1.5, 3.6].every(z => {
+      const point = new THREE.Vector3(x, y, z).project(camera);
+      return Math.abs(point.x) <= 0.93 && Math.abs(point.y) <= 0.93;
+    })))`));
+  }
+  run("language = 'de'; start();");
+  assert.equal(run('session.language'), 'de');
+  assert.equal(elements.get('prompt').textContent, 'Schau zu, wie der Eimer auf den Tisch kommt.');
 });

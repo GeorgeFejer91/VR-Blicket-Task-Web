@@ -3,6 +3,7 @@ export function createSounds() {
   let context;
   let output;
   let enabled = true;
+  let voiceActive = false;
   const sources = new Set();
 
   function unlock() {
@@ -13,7 +14,7 @@ export function createSounds() {
       if (!context) {
         context = new Audio();
         output = context.createGain();
-        output.gain.value = 0.55;
+        output.gain.value = voiceActive ? 0.18 : 0.55;
         output.connect(context.destination);
       }
       context.resume().catch(() => {});
@@ -51,6 +52,10 @@ export function createSounds() {
   return {
     unlock,
     stop,
+    setVoiceActive(active) {
+      voiceActive = active;
+      if (output && context) output.gain.setTargetAtTime(active ? 0.18 : 0.55, context.currentTime, 0.04);
+    },
     toggle() {
       enabled = !enabled;
       if (!enabled) stop();
