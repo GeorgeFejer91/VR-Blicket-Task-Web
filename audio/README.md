@@ -1,6 +1,6 @@
 # Audio cue inventory
 
-`cues.json` is the machine-readable inventory. Each narration cue has a stable ID, triggering game event, English and German script, and two shipped MP3 paths. The game loads these files; it never calls the voice-cloner app at runtime.
+`cues.json` is the inventory from the previous single-set game. Each narration cue has a stable ID, triggering game event, English and German script, and two shipped MP3 paths. The current OR/OR/AND game does not load or play these clips: their singular object prompts and point-choice wording conflict with the new pair trials and multiple blickets. Keep the files as source assets until matching three-set narration is authored, recorded, and verified. The game never calls the voice-cloner app at runtime.
 
 | Cue ID | Trigger ID | English file | German file |
 | --- | --- | --- | --- |
@@ -21,6 +21,6 @@
 | `judge_block` | `final_sequential_prompt_opened:obj_block` | `en/judge_block.mp3` | `de/judge_block.mp3` |
 | `complete` | `session_completed` | `en/complete.mp3` | `de/complete.mp3` |
 
-Sound effects (`rattle`, `land`, `pickup`, `place`, `press`, `activate`, `return`, `choice`, `complete`) are synthesized by `sounds.mjs` at runtime and shared between languages. They have no audio files; `cues.json` lists their triggers. The activation tune plays only for an activating object. The current loop speaks only `intro`, the three `trial_*` placement prompts, `point`, and the three `judge_*` questions. Other authored voice files remain in the inventory but are not triggered. The introduction explains Blicketness; motion and effects tell the rest of the story without running commentary. Sound off mutes both narration and effects.
+Sound effects (`rattle`, `land`, `pickup`, `place`, `press`, `activate`, `return`, `choice`, `complete`) are synthesized by `web/sounds.mjs` at runtime and shared between languages. They have no audio files. The activation tune plays only for an activating subset. Sound off mutes effects.
 
 Voice: Qwen3-TTS 1.7B Base with a saved reference to [Alba MacKenna's Kyutai tts-voices recording](https://huggingface.co/kyutai/tts-voices/blob/main/alba-mackenna/casual.wav), cataloged under CC BY 4.0. Audio is AI-generated speech, and the voice reference is credited here. The model and reference hash are recorded in `cues.json`. German wording is a provisional adaptation and has not been validated with participants.

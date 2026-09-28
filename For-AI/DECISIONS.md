@@ -1,5 +1,11 @@
 # Decisions
 
+## 2026-09-29: Three AND/OR sequences and two-object detector
+
+Run two disjunctive three-object sets followed by one conjunctive three-object set. Each set uses six tests (A, B, C, A+B, A+C, B+C) and three individual judgments. The detector platform is widened so two objects occupy separate slots; checking starts only after the complete pair arrives. Scenario data owns the rule and hidden A/C blicket roles. Export full tested subsets in a v2 session JSON and remove the old singular point-choice question. Participant-facing text does not reveal the rule.
+
+This fixed within-session sequence is an adaptation of the AND/OR evidence patterns in Lucas et al. (2014), not a replication of its between-condition transfer experiment. The previous narrator clips describe the old one-set flow and remain dormant until their scripts and audio are updated. Local Node and browser checks cover 18 outcomes, nine judgments, visual pair placement, export, and restart; hosted evidence belongs in `VERIFICATION.md`.
+
 ## 2026-09-27: Original-video detector, persistent objects and automatic download
 
 Status: accepted. The detector follows the dark box and broad red top seen in original Berkeley and UW I-LABS videos; provenance and adaptation limits are in `machine-references.md`. Web Audio supplies handling effects, a hidden-cause activation tune, neutral response/completion cues and a mute control. The model and tune are game adaptations rather than exact apparatus reproductions.

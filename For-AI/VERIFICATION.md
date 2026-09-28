@@ -1,15 +1,19 @@
 # Verification
 
-Reviewed: 2026-09-27. Use VERIFIED, PARTIAL, BLOCKED, or NOT RUN; report the surface actually observed.
+Reviewed: 2026-09-29. Use VERIFIED, PARTIAL, BLOCKED, or NOT RUN; report the surface actually observed. Sections below the current gates retain historical evidence for earlier single-set releases.
 
 ## Gates
 
 1. Context: `powershell -NoProfile -File For-AI/scripts/check-context.ps1 -ProjectRoot .`. After pushing, add `-RequireRemote`; HEAD must match remote main. Required files and routing exist; secret checks pass.
-2. Focused: `node --check game.js`, `node --check sounds.mjs`, and `node --test tests/*.test.mjs`. JSON parses; the three colors equal `#808080`, materials are matte, prompts/labels contain no old color names, and all trial, bucket, and response IDs resolve. Game-flow checks cover tabletop persistence, repeated Next input, restart during return and one complete serialized JSON download after the last judgment.
-3. Integrated: serve the repository root over HTTP in a desktop WebGL browser. Inspect three gray objects; complete all tests, point choice, and three judgments. Verify a missed drop, contact/press, both outcome signals, sounds/mute, persistent tabletop objects, automatic download with all responses/completion event, and restart. No download button should exist. Outcomes come from `hiddenBlicket`, not appearance.
+2. Focused: `node --check game.js` and `node --test tests/*.test.mjs`. JSON parses; nine distinct shapes share matte `#808080`; all 18 outcomes match the OR/OR/AND evidence patterns; pair members fit separate platform slots; the v2 export contains nine judgments.
+3. Integrated: serve the repository root over HTTP in a desktop WebGL browser. Complete all three buckets, 18 checks and nine judgments. Inspect pair placement during scanning, both outcome signals, export, restart, missed drop, sound control, and narrow text layout as relevant. No download button or disclosed rule label should appear. Outcomes come from scenario roles, not appearance.
 4. Publication: review explicit staged paths, push without force, verify the remote SHA and the Pages build for the public commit. Inspect hosted gray stimuli and complete the hosted flow. Publish reviewed browser code, public documentation, context, and tests only; no private archive, native source, participant data, or local artifacts.
 
 Use installed Node/Python or the Codex bundled runtime if absent from PATH. HTTP is required for fetching scenario JSON.
+
+## Current three-sequence evidence
+
+2026-09-29 local source candidate: VERIFIED for the desktop browser flow. Five Node tests pass. Chromium pointer play completed all 18 single/pair checks and nine judgments; downloaded v2 JSON contains three phase starts, 18 trials, nine judgments, 11 activations, and one completion. Browser warnings/errors: zero. Screenshots confirmed two objects inside the well during an OR scan and the conjunctive A+C scan. A 320×700 completion view had no horizontal clipping. Physical touch input and scientific validation are NOT RUN. The archived narration tests still verify shipped assets, while runtime speech is dormant. Hosted publication is pending for this revision.
 
 ## Bilingual decision and narration gate
 

@@ -1,32 +1,27 @@
 # Browser game protocol
 
-Last updated: 2026-09-28
+Last updated: 2026-09-29. Source of truth: `scenario.json` and `game.js`. This is a playable three-sequence adaptation, not a full research protocol or VR build.
 
-The current source of truth is `scenario.json` plus `game.js`. This is the minimal PC loop, not a full research protocol or a VR build.
+## Sequence and evidence
 
-| Stage | Prompt and 3D action | Visible result | Logged event |
-| --- | --- | --- | --- |
-| Language | Choose English or German, listen to the Blicketness introduction, then Begin/Start | All game text and narration use the selected language; muting lets play start immediately | Session JSON stores `language` |
-| Start | Begin the game | A deep bucket carrying three gray objects moves onto the table, then shakes for 1.45 seconds while the objects rattle and collide before the first object rises | `bucket_arrival_started`, `bucket_arrived`, `bucket_mixing_started`, `bucket_mixed` |
-| Each trial | The current object rises from the bucket; put it on the detector by drag, or select it then click the platform | The platform sinks into an open well until the object's center reaches the rim; a neutral cyan ray crosses it while light washes over the whole object and bounces from the impact point during the 3,600 ms check | `trial_started`, `object_picked_up`, `platform_contact_detected` |
-| Outcome | Watch the detector | The platform and side lamps blink gold and play a short tune for a hidden blicket; the lower BLICKET label glows gold only then. The platform and lamps blink red without a tune otherwise, while the label stays neutral | `detector_outcome` |
-| Next | Advance after each outcome | The tested object visibly moves onto the table beside the detector before the next object rises from the bucket or the final prompt opens | `object_return_started`, `object_returned_to_table`, next `trial_started` |
-| Point choice | Select one of the three lower-middle 2D object buttons | All three objects and the detector stay visible; individual questions begin | `final_point_choice_submitted` |
-| Individual choices | Judge the object marked by a neutral ring using the lower-middle 2D Blicket or Not a Blicket buttons | All objects remain on the table; game completes after three responses | `final_sequential_choice_submitted` |
-| Complete | Submit the third individual judgment | The session JSON download starts automatically, with all responses and the completion event; no download button or network upload | `session_completed` |
+| Set | Rule | New gray shapes | A | B | C | A+B | A+C | B+C |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | Disjunctive | Cube, cylinder, block | + | − | + | + | + | + |
+| 2 | Disjunctive | Sphere, cone, wedge | + | − | + | + | + | + |
+| 3 | Conjunctive | Hexagonal prism, pyramid, capsule | − | − | − | − | + | − |
 
-Only the current object may be tested. A drop away from the platform does not count as contact. Inputs are locked while the detector checks. The current scenario uses cube, cylinder, and rectangular block in that order, all using the same matte gray material. Both outcomes use the same descent and scan; result lights appear only afterward. The UI must not identify hidden blicket status before the detector outcome. Task-object materials remain gray throughout. No avatars or people are rendered.
+`+` means the machine activates; `−` means it stays off. A and C are the hidden blickets in every set. In the disjunctive sets either suffices; in the conjunctive set both are required. The rule is evaluated from scenario roles and the complete placed subset, never from mesh shape or material. The fixed within-session phase order is a game adaptation; Lucas et al. (2014) compared conditions between participants and tested transfer to a separate ambiguous set.
 
-## Narration assets and voice-cloner CLI
+## Player flow
 
-The [audio cue inventory](../audio/README.md) and `audio/cues.json` map each narration cue ID to its triggering game event, exact English/German text, and shipped MP3 files. The introduction adapts the original research script's explanation: appearance cannot reveal Blicketness, which makes the machine light up and play music. It finishes before Begin becomes available; muting permits an immediate start. After that, only the three placement instructions, final point choice, and three individual judgment questions are spoken. Bucket motion, scanning, outcomes, object returns, and completion use motion, effects, and on-screen text without running commentary. The neutral 3.6-second scan ends before a 950 ms dark pause and the result reveal. Narrated cues retain at least 700 ms between them; a new player action may interrupt an older cue. Sound off stops voice and cancels waiting clips. Bucket rattles are spaced at least 450 ms apart and the platform press starts 160 ms after the placement tap. Missing audio must not block play. Existing session JSON event names remain stable; `language` records the selected locale.
+1. Choose English or German, then Begin. Text explains that appearance alone does not reveal blicketness; the UI does not disclose the set's AND/OR rule.
+2. A new bucket arrives with three distinct gray shapes and visibly mixes them for 1.45 seconds. `phase_started`, `bucket_arrival_started`, `bucket_arrived`, `bucket_mixing_started`, and `bucket_mixed` record the transition.
+3. Six trials follow in the order A, B, C, A+B, A+C, B+C. Only the prompted object can be picked up. Drag it onto the red platform, or click the object and then the platform. For a pair, place the first in the left slot and the second in the right slot; the check starts only after both contact events. `trial_started`, `object_picked_up`, and `platform_contact_detected` record the subset and placement order.
+4. The platform lowers, a neutral cyan scan runs for 3.6 seconds, and a 950 ms dark pause precedes the result. Gold and an activation tune mean the full subset activated the detector; red means it stayed off. The task-object materials remain gray. `detector_outcome` and the session's trial entry include `phaseId`, `rule`, `objectIds`, and `activated`.
+5. Next moves the object or pair onto the adjacent table. `object_return_started` and `object_returned_to_table` record the full subset. Repeated Next input during the move does not skip a trial.
+6. After six trials, judge each of that set's three objects with Blicket/Not a Blicket buttons. A neutral ring marks the subject. The next bucket arrives after the third answer. Each response logs `phaseId`, `objectId`, and `saysBlicket`.
+7. After the ninth judgment, `session_completed` and `completedAt` are recorded and a v2 session JSON downloads automatically. It contains 18 trial records and nine judgments; there is no network upload or singular point-choice question.
 
-Generate or repair assets with the sibling `voice-cloner` checkout's CLI (`../voice-cloner/Voice.cmd`), or pass `-VoiceCmd` to the script for another installation. First read that app's `AI-GUIDE.md` and `agent-contract.json`. Run `Voice.cmd doctor`, `voices list`, and `voices show <ID>` to select a saved voice. The inventory pins the Alba reference SHA-256; `tools/generate-blicket-narration.ps1` refuses a different reference. Use the Qwen engine for these shippable assets; its model is Apache 2.0 and the cataloged Alba recording is CC BY 4.0. From this repository root:
+Restart cancels outstanding check timers and begins set 1 with a new session ID. Sound on/off controls synthesized handling and outcome effects. Only an activated detector plays the tune. Existing English/German narration clips are dormant: they describe the earlier one-set, single-object question and would misstate the pair trials. Before re-enabling speech, revise the cue inventory, regenerate and inspect the affected MP3s, and validate text/audio agreement. The previous audio pipeline instructions remain in Git history and `audio/README.md`.
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/generate-blicket-narration.ps1 -VoiceId <saved-Alba-reference-id>
-```
-
-The script calls `Voice.cmd generate --voice <ID> --engine qwen --language en|de --text <inventory text> --output <audio path>` for each missing file and verifies the returned language against the requested locale. It reuses existing MP3s; after changing a line, pass `-CueId <cue-id> -Force` to regenerate that cue in both languages. The CLI starts or reuses its local server and returns JSON. If a job times out, use its `job_id` with `Voice.cmd jobs wait`; do not submit the same text twice. Keep references, profiles, model caches, and the app's private outputs outside this repository. Check all 32 shipped MP3s with ffprobe and local speech recognition before publication; human listening is still required before participant use because automatic checks cannot establish complete pronunciation or German translation quality.
-
-If a future request changes prompts, object motion, detector rules, responses, or logging, update this document and the scenario/runtime together. Keep the historical native protocol in Git history; it is no longer the active specification.
+Source interpretation and adaptation limits are in `scientific-context.md`; browser and publication gates are in `VERIFICATION.md`.

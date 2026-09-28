@@ -1,89 +1,38 @@
 {
-  "schema": "vr-blicket-web-scenario.v1",
-  "scenarioId": "v1_gray_object_types",
-  "title": "Hidden Object Types",
-  "protocolFamily": "single-object deterministic evidence",
-  "ruleType": "deterministic_hidden_object",
+  "schema": "vr-blicket-web-scenario.v2",
+  "scenarioId": "functional_form_or_or_and_gray_v1",
+  "title": "Three functional-form sequences",
+  "protocolFamily": "AND/OR training adaptation",
   "participantRole": "active tester",
-  "instructions": "One bucket carrying three objects arrives. Test each object on the blicket detector platform. After each result, advance to move it onto the table beside the detector. Point to the blicket among those objects, then judge each object marked by a ring.",
-  "objects": [
+  "evidenceOrder": [["A"], ["B"], ["C"], ["A", "B"], ["A", "C"], ["B", "C"]],
+  "phases": [
     {
-      "id": "obj_cube",
-      "label": "Cube",
-      "visible": { "shape": "cube", "color": "#808080", "material": "matte" },
-      "hiddenBlicket": true
+      "id": "or_1", "rule": "disjunctive", "bucketId": "bucket_or_1",
+      "objects": [
+        { "id": "or1_cube", "role": "A", "label": "Cube", "visible": { "shape": "cube", "color": "#808080", "material": "matte" }, "hiddenBlicket": true },
+        { "id": "or1_column", "role": "B", "label": "Cylinder", "visible": { "shape": "column", "color": "#808080", "material": "matte" }, "hiddenBlicket": false },
+        { "id": "or1_block", "role": "C", "label": "Rectangular block", "visible": { "shape": "block", "color": "#808080", "material": "matte" }, "hiddenBlicket": true }
+      ]
     },
     {
-      "id": "obj_column",
-      "label": "Cylinder",
-      "visible": { "shape": "column", "color": "#808080", "material": "matte" },
-      "hiddenBlicket": false
+      "id": "or_2", "rule": "disjunctive", "bucketId": "bucket_or_2",
+      "objects": [
+        { "id": "or2_sphere", "role": "A", "label": "Sphere", "visible": { "shape": "sphere", "color": "#808080", "material": "matte" }, "hiddenBlicket": true },
+        { "id": "or2_cone", "role": "B", "label": "Cone", "visible": { "shape": "cone", "color": "#808080", "material": "matte" }, "hiddenBlicket": false },
+        { "id": "or2_wedge", "role": "C", "label": "Wedge", "visible": { "shape": "wedge", "color": "#808080", "material": "matte" }, "hiddenBlicket": true }
+      ]
     },
     {
-      "id": "obj_block",
-      "label": "Rectangular block",
-      "visible": { "shape": "block", "color": "#808080", "material": "matte" },
-      "hiddenBlicket": false
+      "id": "and_3", "rule": "conjunctive", "bucketId": "bucket_and_3",
+      "objects": [
+        { "id": "and3_prism", "role": "A", "label": "Hexagonal prism", "visible": { "shape": "prism", "color": "#808080", "material": "matte" }, "hiddenBlicket": true },
+        { "id": "and3_pyramid", "role": "B", "label": "Pyramid", "visible": { "shape": "pyramid", "color": "#808080", "material": "matte" }, "hiddenBlicket": false },
+        { "id": "and3_capsule", "role": "C", "label": "Capsule", "visible": { "shape": "capsule", "color": "#808080", "material": "matte" }, "hiddenBlicket": true }
+      ]
     }
   ],
-  "buckets": [
-    { "id": "shared_bucket", "label": "Object bucket", "arrivalOrder": 1, "objectIds": ["obj_cube", "obj_column", "obj_block"] }
-  ],
-  "trialOrder": [
-    {
-      "trialId": "trial_1",
-      "order": 1,
-      "bucketId": "shared_bucket",
-      "objectId": "obj_cube",
-      "participantAction": "drag_object_to_platform",
-      "prompt": "Test the cube from the bucket."
-    },
-    {
-      "trialId": "trial_2",
-      "order": 2,
-      "bucketId": "shared_bucket",
-      "objectId": "obj_column",
-      "participantAction": "drag_object_to_platform",
-      "prompt": "Test the cylinder from the bucket."
-    },
-    {
-      "trialId": "trial_3",
-      "order": 3,
-      "bucketId": "shared_bucket",
-      "objectId": "obj_block",
-      "participantAction": "drag_object_to_platform",
-      "prompt": "Test the rectangular block from the bucket."
-    }
-  ],
-  "detector": {
-    "checkDurationMs": 3600,
-    "activationDurationMs": 1400,
-    "activeCue": "gold_detector_blink",
-    "inactiveCue": "red_detector_blink"
-  },
-  "finalPrompt": {
-    "prompt": "Point to the object you think is the blicket.",
-    "pointPrompt": "Point to the object you think is the blicket.",
-    "sequentialPrompt": "Is this object a blicket?",
-    "choices": ["blicket", "not_blicket"],
-    "pointObjectIds": ["obj_cube", "obj_column", "obj_block"],
-    "sequentialObjectIds": ["obj_cube", "obj_column", "obj_block"]
-  },
+  "detector": { "checkDurationMs": 3600, "activationDurationMs": 1400 },
   "sourceCitations": [
-    {
-      "id": "gopnik_sobel_2000",
-      "title": "Detecting blickets: How young children use information about novel causal powers in categorization and induction",
-      "url": "https://doi.org/10.1111/1467-8624.00224"
-    },
-    {
-      "id": "gopnik_et_al_2001",
-      "title": "Causal learning mechanisms in very young children: Two-, three-, and four-year-olds infer causal relations from patterns of variation and covariation",
-      "url": "https://www.cmu.edu/dietrich/philosophy/docs/glymour/GopnikEtAl2001-LearningInKids.pdf"
-    },
-    {
-      "id": "kosoy_et_al_2022",
-      "title": "Young children are the best learners for causal overhypotheses",
-      "url": "https://proceedings.mlr.press/v177/kosoy22a.html"
-    }
+    { "id": "lucas_et_al_2014", "title": "When children are better (or at least more open-minded) learners than adults", "doi": "10.1016/j.cognition.2013.12.010" }
   ]
 }

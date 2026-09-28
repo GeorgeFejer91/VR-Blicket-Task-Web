@@ -25,14 +25,14 @@
       <main>
         <section class="instructions" aria-live="polite">
           <h2 id="prompt">What is a blicket?</h2>
-          <p id="detail">You cannot tell by looking. Blicketness makes the machine light up and play music. Test the objects to find out.</p>
+          <p id="detail">You cannot tell by looking. Test three new sets of objects to discover what makes the detector go. More than one object can be a blicket.</p>
         </section>
 
         <div class="playfield">
           <div id="scene" class="scene" role="img" aria-label="Interactive 3D Blicket detector and objects"></div>
           <div id="language-menu" class="language-menu" aria-labelledby="language-title">
             <h3 id="language-title">Choose a language</h3>
-            <p id="language-detail">The game and narrator will use your choice.</p>
+            <p id="language-detail">The game will use your choice.</p>
             <div class="language-choices">
               <button id="language-en" type="button" lang="en">English</button>
               <button id="language-de" type="button" lang="de">Deutsch</button>
@@ -40,9 +40,6 @@
             <button id="begin" type="button" disabled>Loading 3D scene…</button>
           </div>
           <div id="quiz" class="quiz" role="group" aria-label="Answer choices" hidden>
-            <button id="answer-cube" type="button" data-object-id="obj_cube" hidden>Cube</button>
-            <button id="answer-column" type="button" data-object-id="obj_column" hidden>Cylinder</button>
-            <button id="answer-block" type="button" data-object-id="obj_block" hidden>Rectangular block</button>
             <button id="answer-yes" type="button" data-answer="blicket" hidden>Blicket</button>
             <button id="answer-no" type="button" data-answer="not_blicket" hidden>Not a Blicket</button>
           </div>
@@ -51,11 +48,11 @@
         <div class="footer-row">
           <span id="feedback" role="status">Select Begin to start.</span>
           <div class="actions">
-            <button id="next" type="button" hidden>Next object</button>
+            <button id="next" type="button" hidden>Next test</button>
           </div>
         </div>
       </main>
     </div>
-    <script type="module" src="./game.js?v=20260928i"></script>
+    <script type="module" src="./game.js?v=20260929a"></script>
   </body>
 </html>

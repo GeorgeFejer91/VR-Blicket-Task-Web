@@ -29,7 +29,7 @@ These are newly drafted instructions, not quotations from a validated German pro
 - Judgment: “Glaubst du, dass dieses Objekt ein Blicket oder kein Blicket ist?”
 - Intervention for designs allowing combinations: “Was würdest du tun, damit die Maschine angeht?”
 
-The last question avoids imposing a singular answer. For an AND/OR protocol, do not teach that every Blicket necessarily activates the detector alone, and allow selecting combinations. For this existing one-cause demo, a single-object final choice is coherent but does not test conjunction learning. Use *Objekt* for adult instructions or pilot *Teil* with children; neutral reference words are not replacements for the category label.
+The last question avoids imposing a singular answer. For an AND/OR protocol, do not teach that every Blicket necessarily activates the detector alone, and allow selecting combinations. The current three-set game asks individual blicket judgments after testing both singles and pairs; its earlier single-object point choice has been removed. Use *Objekt* for adult instructions or pilot *Teil* with children; neutral reference words are not replacements for the category label.
 
 Before experimental use, have German-speaking researchers review and independently back-translate the full script, then pilot understanding with the target age group. Preserve explanation, feedback, question order, noun/adjective usage, and number cues across conditions. Wente's translation methods illustrate why singular/plural wording can change a task ([Translation section](https://www.pure.ed.ac.uk/ws/portalfiles/portal/39857102/Wente_et_al_2017_1.pdf)).
 
