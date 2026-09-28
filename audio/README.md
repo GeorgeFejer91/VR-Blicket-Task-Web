@@ -21,6 +21,6 @@
 | `judge_block` | `final_sequential_prompt_opened:obj_block` | `en/judge_block.mp3` | `de/judge_block.mp3` |
 | `complete` | `session_completed` | `en/complete.mp3` | `de/complete.mp3` |
 
-Sound effects (`rattle`, `land`, `pickup`, `place`, `press`, `activate`, `return`, `choice`, `complete`) are synthesized by `sounds.mjs` at runtime and shared between languages. They have no audio files; `cues.json` lists their triggers. The activation tune plays only for an activating object. Sound off mutes both narration and effects.
+Sound effects (`rattle`, `land`, `pickup`, `place`, `press`, `activate`, `return`, `choice`, `complete`) are synthesized by `sounds.mjs` at runtime and shared between languages. They have no audio files; `cues.json` lists their triggers. The activation tune plays only for an activating object. Pickup and return have authored voice files in the inventory but the game now uses only handling effects for those routine actions, leaving space around the scan and result lines. Sound off mutes both narration and effects.
 
 Voice: Qwen3-TTS 1.7B Base with a saved reference to [Alba MacKenna's Kyutai tts-voices recording](https://huggingface.co/kyutai/tts-voices/blob/main/alba-mackenna/casual.wav), cataloged under CC BY 4.0. Audio is AI-generated speech, and the voice reference is credited here. The model and reference hash are recorded in `cues.json`. German wording is a provisional adaptation and has not been validated with participants.

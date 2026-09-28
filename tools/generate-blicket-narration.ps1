@@ -30,6 +30,10 @@ foreach ($cue in $inventory.narration) {
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $target) -or (Get-Item -LiteralPath $target).Length -eq 0) {
       throw "Generation failed for $language/$($cue.id): $($result.error)"
     }
+    $expectedLanguage = @{ en = 'English'; de = 'German' }[$language]
+    if ($result.language -ne $expectedLanguage) {
+      throw "Wrong generation language for $language/$($cue.id): $($result.language)"
+    }
   }
 }
 

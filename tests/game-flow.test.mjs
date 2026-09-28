@@ -11,11 +11,14 @@ test('objects persist and a complete session downloads once after the final judg
   const elements = new Map();
   const effects = [];
   const downloads = [];
+  const scheduled = [];
+  const spoken = [];
   let downloadBlob;
   const context = vm.createContext({
-    THREE, stepBucketBodies, copy, objectName, console, performance, Blob, crypto: { randomUUID },
+    THREE, stepBucketBodies, copy, objectName, console, performance, Blob, crypto: { randomUUID }, spoken,
     URL: { createObjectURL(blob) { downloadBlob = blob; return 'blob:session'; }, revokeObjectURL() {} },
-    setTimeout: () => 1, clearTimeout() {},
+    setTimeout: (callback, delay) => { scheduled.push({ callback, delay }); return scheduled.length; },
+    clearTimeout() {},
     createSounds: () => ({ unlock() {}, stop() {}, play: (effect) => effects.push(effect) }),
     document: { createElement(tag) {
       assert.equal(tag, 'a');
@@ -33,6 +36,7 @@ test('objects persist and a complete session downloads once after the final judg
   context.fixture = JSON.parse(readFileSync(new URL('../scenario.json', import.meta.url), 'utf8'));
   run(`
     scenario = fixture;
+    narration = { play(id) { spoken.push(id); }, stop() {}, setLanguage() {} };
     scene = new THREE.Scene();
     machine = new THREE.Group();
     machine.position.copy(DETECTOR);
@@ -72,14 +76,25 @@ test('objects persist and a complete session downloads once after the final judg
   assert.equal(run('overPlatform(new THREE.Vector3(DETECTOR.x + 2, 0, DETECTOR.z), currentObject)'), false);
   for (let index = 0; index < 3; index += 1) {
     run('stage = "held"; placeObject();');
+    assert.deepEqual(scheduled.slice(-2).map(({ delay }) => delay), [550, 4250]);
     assert.equal(run('scanBeam.visible'), false);
     run('for (let frame = 0; frame < 30; frame += 1) animate(lastFrame + 20);');
+    scheduled.at(-2).callback();
+    assert.equal(spoken.at(-1), 'checking');
     assert.equal(run('scanBeam.visible'), true);
     assert.equal(run('scanBounce.visible'), true);
     assert.equal(run('scanFloodLight.intensity'), 5);
     assert.ok(run('scanBounce.position.x < 0'));
     assert.ok(Math.abs(run('currentObject.position.y - RECESS_LIP_Y')) < 1e-8);
+    run('for (let frame = 0; frame < 160; frame += 1) animate(lastFrame + 20);');
+    assert.equal(run('stage'), 'checking');
+    assert.equal(run('scanBeam.visible'), false);
+    assert.equal(run('scanFloodLight.intensity'), 0);
     run('showOutcome();');
+    assert.equal(scheduled.at(-1).delay, 1500);
+    assert.equal(spoken.at(-1), 'checking');
+    scheduled.at(-1).callback();
+    assert.equal(spoken.at(-1), index === 0 ? 'activated' : 'inactive');
     assert.equal(run('stage'), 'outcome');
     assert.equal(run('scanBeam.visible'), false);
     assert.equal(run('scanBounce.visible'), false);

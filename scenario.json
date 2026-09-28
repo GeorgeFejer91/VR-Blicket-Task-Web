@@ -56,7 +56,7 @@
     }
   ],
   "detector": {
-    "checkDurationMs": 1500,
+    "checkDurationMs": 3600,
     "activationDurationMs": 1400,
     "activeCue": "gold_detector_blink",
     "inactiveCue": "red_detector_blink"

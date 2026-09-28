@@ -3,7 +3,7 @@ import { stepBucketBodies } from './bucket-physics.mjs';
 import { createSounds } from './sounds.mjs?v=20260928f';
 import { sizeTextRegions } from './text-layout.mjs?v=20260928c';
 import { copy, objectName } from './copy.mjs';
-import { createNarration } from './narration.mjs?v=20260928f';
+import { createNarration } from './narration.mjs?v=20260928g';
 
 const ui = Object.fromEntries(
   ['scene', 'prompt', 'detail', 'progress', 'feedback', 'begin', 'next', 'restart', 'sound',
@@ -21,6 +21,8 @@ const PLATFORM_HALF_X = 1.00;
 const PLATFORM_HALF_Z = 1.00;
 const RECESS_LIP_Y = 2.15;
 const SCAN_START_SECONDS = 0.55;
+const REVEAL_PAUSE_MS = 650;
+const RESULT_VOICE_MARGIN_MS = 100;
 const TABLE_TOP = -0.09;
 const RETURN_SECONDS = 0.65;
 const sounds = createSounds();
@@ -554,7 +556,6 @@ function onPointerDown(event) {
     ui.feedback.textContent = t('heldFeedback');
     sounds.play('pickup');
     log('object_picked_up', { trialId: activeTrial().trialId, objectId: currentObject.userData.objectId });
-    narration?.play('picked_up');
     return;
   }
   if (stage === 'held' && target.action === 'platform') {
@@ -683,11 +684,15 @@ function placeObject() {
   sounds.play('place');
   sounds.play('press');
   log('platform_contact_detected', { trialId: trial.trialId, objectId: trial.objectId });
-  narration?.play('checking');
+  const scanCueTimer = setTimeout(() => {
+    pendingTimers.delete(scanCueTimer);
+    if (stage === 'checking') narration?.play('checking');
+  }, SCAN_START_SECONDS * 1000);
+  pendingTimers.add(scanCueTimer);
   const timer = setTimeout(() => {
     pendingTimers.delete(timer);
     showOutcome();
-  }, scenario.detector.checkDurationMs);
+  }, scenario.detector.checkDurationMs + REVEAL_PAUSE_MS);
   pendingTimers.add(timer);
 }
 
@@ -713,7 +718,11 @@ function showOutcome() {
   ui.next.textContent = t(trialIndex + 1 < scenario.trialOrder.length ? 'next' : 'choices');
   session.trials.push({ trialId: trial.trialId, objectId: trial.objectId, activated });
   log('detector_outcome', { trialId: trial.trialId, objectId: trial.objectId, activated });
-  narration?.play(activated ? 'activated' : 'inactive', true);
+  const resultCueTimer = setTimeout(() => {
+    pendingTimers.delete(resultCueTimer);
+    if (stage === 'outcome') narration?.play(activated ? 'activated' : 'inactive', true);
+  }, Math.max(scenario.detector.activationDurationMs, 1400) + RESULT_VOICE_MARGIN_MS);
+  pendingTimers.add(resultCueTimer);
 }
 
 function advance() {
@@ -728,7 +737,6 @@ function advance() {
   ui.detail.textContent = t('returningDetail');
   ui.feedback.textContent = t('returningFeedback');
   log('object_return_started', { trialId: activeTrial().trialId, objectId: currentObject.userData.objectId });
-  narration?.play('returning');
 }
 
 function tablePosition(object) {
@@ -936,7 +944,7 @@ function animate(time) {
     const eased = progress * progress * (3 - 2 * progress);
     const drop = PLATFORM_TOP - RECESS_LIP_Y + objectHalfHeight(currentObject);
     platform.position.y = PLATFORM_Y - drop * eased;
-    scanBeam.visible = progress === 1;
+    scanBeam.visible = progress === 1 && checkElapsed < scenario.detector.checkDurationMs / 1000;
     const scanProgress = Math.max(0, Math.min((checkElapsed - SCAN_START_SECONDS) /
       (scenario.detector.checkDurationMs / 1000 - SCAN_START_SECONDS), 1));
     scanBeam.position.y = RECESS_LIP_Y + 0.07 + 0.19 * Math.sin(scanProgress * Math.PI);
