@@ -2,7 +2,8 @@ import * as THREE from './vendor/three.module.min.js';
 import { stepBucketBodies } from './bucket-physics.mjs';
 import { createSounds } from './sounds.mjs?v=20260928f';
 import { sizeTextRegions } from './text-layout.mjs?v=20260928c';
-import { copy, objectName } from './copy.mjs?v=20260929a';
+import { copy, objectName } from './copy.mjs?v=20260929b';
+import { createNarration } from './narration.mjs?v=20260929b';
 
 const ui = Object.fromEntries(
   ['scene', 'prompt', 'detail', 'progress', 'feedback', 'begin', 'next', 'restart', 'sound',
@@ -23,8 +24,11 @@ const RECESS_LIP_Y = 2.15;
 const SCAN_START_SECONDS = 0.55;
 const REVEAL_PAUSE_MS = 950;
 const TABLE_TOP = -0.09;
-const RETURN_SECONDS = 0.65;
+const MACHINE_RIM_TOP = 2.27;
+const RETURN_SECONDS = 1.0;
+const PLACE_SECONDS = 0.9;
 const sounds = createSounds();
+let narration;
 let language = 'en';
 let languageChosen = false;
 const t = (key, values) => copy(language, key, values);
@@ -32,7 +36,7 @@ const nameOf = (id) => objectName(scenario.phases.flatMap((phase) => phase.objec
 const BUCKET_ENTRY_X = -6.6;
 const ARRIVAL_SECONDS = 1.8;
 const MIX_SECONDS = 1.45;
-const LIFT_SECONDS = 0.55;
+const LIFT_SECONDS = 0.8;
 const raycaster = new THREE.Raycaster();
 const scanRaycaster = new THREE.Raycaster();
 scanRaycaster.far = 3.0;
@@ -70,14 +74,11 @@ let pointerHeld = false;
 let draggedObject = false;
 let lastFrame = 0;
 let arrivalElapsed = 0;
-let liftElapsed = 0;
-let liftFrom;
+let flight;
 let bucketBodies = [];
 let outcomeActivated = null;
 let outcomeAt = 0;
-let returnElapsed = 0;
-let returnFrom = [];
-let returnTo = [];
+let returnFlights = [];
 let lastRattleAt = 0;
 let mixElapsed = 0;
 let checkElapsed = 0;
@@ -93,9 +94,14 @@ boot().catch((error) => {
 });
 
 async function boot() {
-  const response = await fetch('./scenario.json', { cache: 'no-store' });
+  const [response, audioResponse] = await Promise.all([
+    fetch('./scenario.json', { cache: 'no-store' }),
+    fetch('./audio/cues.json', { cache: 'no-store' }).catch(() => null),
+  ]);
   if (!response.ok) throw new Error('Game data could not load.');
   scenario = await response.json();
+  narration = createNarration(audioResponse?.ok ? await audioResponse.json() : { narration: [] },
+    (active) => sounds.setVoiceActive(active));
   if (scenario.phases?.length !== 3 || scenario.evidenceOrder?.length !== 6 ||
       scenario.phases.some((phase) => phase.objects.length !== 3 || !['disjunctive', 'conjunctive'].includes(phase.rule))) {
     throw new Error('This game needs three three-object AND/OR phases.');
@@ -110,10 +116,16 @@ async function boot() {
       language = code;
       languageChosen = true;
       document.documentElement.lang = code;
+      narration.setLanguage(code);
       applyLanguage();
-      ui.begin.disabled = false;
-      ui.feedback.textContent = t('introFeedback');
-      ui.begin.focus({ preventScroll: true });
+      ui.begin.disabled = true;
+      ui.feedback.textContent = t('introListening');
+      narration.play('intro', false, () => {
+        if (stage !== 'intro' || !languageChosen) return;
+        ui.begin.disabled = false;
+        ui.feedback.textContent = t('introReady');
+        ui.begin.focus({ preventScroll: true });
+      });
     });
   }
   ui['answer-yes'].addEventListener('click', () => { if (stage === 'judge') submitJudgment(true); });
@@ -122,8 +134,13 @@ async function boot() {
   ui.restart.addEventListener('click', start);
   ui.sound.addEventListener('click', () => {
     const enabled = sounds.toggle();
+    narration.setEnabled(enabled);
     ui.sound.textContent = t(enabled ? 'soundOn' : 'soundOff');
     ui.sound.setAttribute('aria-pressed', String(enabled));
+    if (!enabled && stage === 'intro' && languageChosen) {
+      ui.begin.disabled = false;
+      ui.feedback.textContent = t('introReady');
+    }
   });
   renderer.domElement.addEventListener('pointerdown', onPointerDown);
   renderer.domElement.addEventListener('pointermove', onPointerMove);
@@ -412,9 +429,12 @@ function renderIntro() {
 
 function start() {
   sounds.stop();
+  narration?.stop();
   sounds.unlock();
   for (const timer of pendingTimers) clearTimeout(timer);
   pendingTimers.clear();
+  flight = null;
+  returnFlights = [];
   session = {
     schema: 'vr_blicket_task.web_session.v2',
     sessionId: crypto.randomUUID(),
@@ -450,6 +470,8 @@ function beginPhase(index) {
   judgmentIndex = 0;
   placementIndex = 0;
   placedObjects = [];
+  flight = null;
+  returnFlights = [];
   ui.next.hidden = true;
   machine.visible = true;
   machine.position.y = 0;
@@ -505,8 +527,7 @@ function showPlacement() {
   currentObject = objects.get(id);
   bucketBodies = bucketBodies.filter((body) => body.id !== id);
   scene.attach(currentObject);
-  liftFrom = currentObject.position.clone();
-  liftElapsed = 0;
+  flight = makeFlight(currentObject, START, LIFT_SECONDS);
   currentObject.rotation.set(0, 0, 0);
   bucket.visible = true;
   machine.visible = true;
@@ -528,6 +549,7 @@ function readyTrial() {
   ui.feedback.textContent = t('readyFeedback', { object: nameOf(id) });
   if (placementIndex === 0) log('trial_started', { trialId: trial.trialId, phaseId: phase().id,
     objectIds: trial.objectIds });
+  narration?.play(placementIndex === 0 ? 'place_object' : 'add_object');
 }
 
 function setDetector(outcome, lit = true) {
@@ -613,9 +635,9 @@ function onPointerUp(event) {
   if (stage !== 'held') return;
   if (draggedObject && pointOnPlane(event) && overPlatform(dropPoint, currentObject)) {
     placeObject();
-  } else {
-    currentObject.position.copy(START);
-    currentObject.position.y += 0.16;
+  } else if (draggedObject) {
+    stage = 'resetting';
+    flight = makeFlight(currentObject, START, LIFT_SECONDS, placedObjects);
   }
 }
 
@@ -626,7 +648,10 @@ function onPointerCancel(event) {
   if (renderer.domElement.hasPointerCapture(event.pointerId)) {
     renderer.domElement.releasePointerCapture(event.pointerId);
   }
-  if (stage === 'held') currentObject.position.copy(START);
+  if (stage === 'held') {
+    stage = 'resetting';
+    flight = makeFlight(currentObject, START, LIFT_SECONDS, placedObjects);
+  }
 }
 
 function clickable(target) {
@@ -693,12 +718,52 @@ function objectHalfHeight(mesh) {
   return (mesh.geometry.boundingBox.max.y - mesh.geometry.boundingBox.min.y) / 2;
 }
 
+function makeFlight(object, to, duration, obstacles = []) {
+  const halfHeight = objectHalfHeight(object);
+  const obstacleTop = obstacles.reduce((top, other) =>
+    Math.max(top, other.position.y + objectHalfHeight(other)), 0);
+  return {
+    object, from: object.position.clone(), to: to.clone(), duration, elapsed: 0,
+    highY: Math.max(object.position.y, to.y, MACHINE_RIM_TOP + halfHeight + 0.28,
+      obstacleTop + halfHeight + 0.28),
+  };
+}
+
+function moveFlight(motion, delta) {
+  motion.elapsed += delta;
+  const progress = Math.min(motion.elapsed / motion.duration, 1);
+  const ease = (value) => value * value * (3 - 2 * value);
+  const { object, from, to, highY } = motion;
+  if (progress < 0.28) {
+    object.position.set(from.x, THREE.MathUtils.lerp(from.y, highY, ease(progress / 0.28)), from.z);
+  } else if (progress < 0.72) {
+    const across = ease((progress - 0.28) / 0.44);
+    object.position.set(THREE.MathUtils.lerp(from.x, to.x, across),
+      highY + 0.16 * Math.sin(Math.PI * across),
+      THREE.MathUtils.lerp(from.z, to.z, across));
+  } else {
+    object.position.set(to.x, THREE.MathUtils.lerp(highY, to.y, ease((progress - 0.72) / 0.28)), to.z);
+  }
+  return progress === 1;
+}
+
 function placeObject() {
   if (stage !== 'held') return;
   const trial = activeTrial();
+  narration?.stop();
+  stage = 'placing';
   pointerHeld = false;
   const slot = trial.objectIds.length === 1 ? 0 : placementIndex === 0 ? -PAIR_X : PAIR_X;
-  currentObject.position.set(DETECTOR.x + slot, PLATFORM_TOP + objectHalfHeight(currentObject), DETECTOR.z);
+  const destination = new THREE.Vector3(DETECTOR.x + slot,
+    PLATFORM_TOP + objectHalfHeight(currentObject), DETECTOR.z);
+  flight = makeFlight(currentObject, destination, PLACE_SECONDS, placedObjects);
+  ui.prompt.textContent = t('placingPrompt');
+  ui.detail.textContent = t('placingDetail');
+  ui.feedback.textContent = t('placingFeedback');
+}
+
+function finishPlacement() {
+  const trial = activeTrial();
   placedObjects.push(currentObject);
   const id = currentObject.userData.objectId;
   log('platform_contact_detected', { trialId: trial.trialId, phaseId: phase().id, objectId: id,
@@ -755,10 +820,9 @@ function showOutcome() {
 function advance() {
   if (stage !== 'outcome') return;
   sounds.stop();
+  narration?.stop();
   stage = 'returning';
-  returnElapsed = 0;
-  returnFrom = placedObjects.map((object) => object.position.clone());
-  returnTo = placedObjects.map(tablePosition);
+  returnFlights = placedObjects.map((object) => makeFlight(object, tablePosition(object), RETURN_SECONDS));
   setDetector(null);
   ui.next.hidden = true;
   ui.detail.textContent = t('returningDetail');
@@ -772,7 +836,7 @@ function tablePosition(object) {
 }
 
 function finishReturn() {
-  placedObjects.forEach((object, index) => object.position.copy(returnTo[index]));
+  returnFlights.forEach(({ object, to }) => object.position.copy(to));
   sounds.play('return');
   log('object_returned_to_table', { trialId: activeTrial().trialId, objectIds: activeTrial().objectIds });
   trialIndex += 1;
@@ -795,6 +859,7 @@ function showJudgment() {
   ui.detail.textContent = t('judgeDetail');
   ui.feedback.textContent = t('judgeFeedback');
   log('final_sequential_prompt_opened', { phaseId: phase().id, objectId });
+  narration?.play('judge_object');
 }
 
 function submitJudgment(saysBlicket) {
@@ -811,6 +876,7 @@ function submitJudgment(saysBlicket) {
 
 function complete() {
   if (stage === 'complete') return;
+  narration?.stop();
   stage = 'complete';
   setQuiz(null);
   judgmentMarker.visible = false;
@@ -924,23 +990,25 @@ function animate(time) {
       showTrial();
     }
   }
-  if (stage === 'presenting') {
-    liftElapsed += delta;
-    const progress = Math.min(liftElapsed / LIFT_SECONDS, 1);
-    const eased = 1 - (1 - progress) ** 3;
-    currentObject.position.lerpVectors(liftFrom, START, eased);
-    if (progress === 1) readyTrial();
+  if (flight && (stage === 'presenting' || stage === 'placing' || stage === 'resetting')) {
+    if (moveFlight(flight, delta)) {
+      const finishedStage = stage;
+      flight = null;
+      if (finishedStage === 'presenting') readyTrial();
+      else if (finishedStage === 'placing') finishPlacement();
+      else {
+        stage = 'ready';
+        ui.prompt.textContent = t('readyPrompt', { object: nameOf(currentObject.userData.objectId) });
+        ui.detail.textContent = t('readyDetail');
+        ui.feedback.textContent = t('readyFeedback', { object: nameOf(currentObject.userData.objectId) });
+      }
+    }
   }
 
   if (stage === 'returning') {
-    returnElapsed += delta;
-    const progress = Math.min(returnElapsed / RETURN_SECONDS, 1);
-    const eased = progress * progress * (3 - 2 * progress);
-    placedObjects.forEach((object, index) => {
-      object.position.lerpVectors(returnFrom[index], returnTo[index], eased);
-      object.position.y += Math.sin(progress * Math.PI) * 0.55;
-    });
-    if (progress === 1) finishReturn();
+    let returned = true;
+    for (const motion of returnFlights) returned = moveFlight(motion, delta) && returned;
+    if (returned) finishReturn();
   }
 
   if (stage === 'checking') {

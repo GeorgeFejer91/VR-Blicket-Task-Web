@@ -16,7 +16,8 @@ test('every narrated event has distinct English and German shipped audio', () =>
       assert.ok(statSync(file).size > 1000, `${cue.id}/${language} has no useful audio`);
     }
   }
-  for (const id of ['intro', 'arrival', 'mixing', 'picked_up', 'checking', 'activated', 'inactive', 'returning', 'point', 'complete']) {
+  for (const id of ['intro', 'place_object', 'add_object', 'judge_object', 'arrival', 'mixing',
+    'picked_up', 'checking', 'activated', 'inactive', 'returning', 'point', 'complete']) {
     assert.ok(ids.has(id), `missing event cue ${id}`);
   }
   for (const object of ['cube', 'column', 'block']) {

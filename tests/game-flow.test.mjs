@@ -18,6 +18,7 @@ test('OR, OR, AND sequences use distinct gray sets and accept two separate place
   const elements = new Map();
   const downloads = [];
   const effects = [];
+  const spoken = [];
   let downloadBlob;
   const context = vm.createContext({
     THREE, stepBucketBodies, copy, objectName, console, performance, Blob, crypto: { randomUUID },
@@ -41,6 +42,7 @@ test('OR, OR, AND sequences use distinct gray sets and accept two separate place
   vm.runInContext(source, context);
   const run = (code) => vm.runInContext(code, context);
   context.fixture = fixture;
+  context.spoken = spoken;
   run(`
     scenario = fixture;
     scene = new THREE.Scene();
@@ -62,6 +64,7 @@ test('OR, OR, AND sequences use distinct gray sets and accept two separate place
       mesh.userData.bucketRadius = 0.4;
       objects.set(spec.id, mesh);
     }
+    narration = { stop() {}, play(id) { spoken.push(id); } };
     start();
   `);
   const expected = [
@@ -80,10 +83,15 @@ test('OR, OR, AND sequences use distinct gray sets and accept two separate place
         assert.equal(run('stage'), 'ready');
         assert.equal(run('currentObject.userData.objectId'), ids[placement]);
         run('stage = "held"; placeObject();');
+        assert.equal(run('stage'), 'placing');
+        assert.equal(run('placedObjects.length'), placement);
+        run('for (let frame = 0; frame < 23; frame += 1) animate(lastFrame + 20);');
+        assert.ok(run('currentObject.position.y - objectHalfHeight(currentObject) > MACHINE_RIM_TOP'));
+        run('for (let frame = 0; frame < 23; frame += 1) animate(lastFrame + 20);');
         if (placement + 1 < ids.length) {
           assert.equal(run('stage'), 'presenting');
           assert.equal(run('placedObjects.length'), 1);
-          run('for (let frame = 0; frame < 30; frame += 1) animate(lastFrame + 20);');
+          run('for (let frame = 0; frame < 42; frame += 1) animate(lastFrame + 20);');
         }
       }
       assert.equal(run('stage'), 'checking');
@@ -96,7 +104,9 @@ test('OR, OR, AND sequences use distinct gray sets and accept two separate place
       run('showOutcome();');
       assert.equal(run('session.trials.at(-1).activated'), expected[phaseIndex][trialIndex]);
       assert.deepEqual(Array.from(run('session.trials.at(-1).objectIds')), ids);
-      run('advance(); for (let frame = 0; frame < 68; frame += 1) animate(lastFrame + 20);');
+      run('advance(); for (let frame = 0; frame < 24; frame += 1) animate(lastFrame + 20);');
+      assert.ok(run('placedObjects.every(object => object.position.y - objectHalfHeight(object) > MACHINE_RIM_TOP)'));
+      run('for (let frame = 0; frame < 78; frame += 1) animate(lastFrame + 20);');
       assert.equal(run('stage'), trialIndex < 5 ? 'ready' : 'judge');
     }
     for (let judgment = 0; judgment < 3; judgment += 1) {
@@ -107,6 +117,9 @@ test('OR, OR, AND sequences use distinct gray sets and accept two separate place
   assert.equal(run('session.trials.length'), 18);
   assert.equal(run('session.judgments.length'), 9);
   assert.equal(effects.filter((effect) => effect === 'activate').length, 11);
+  assert.equal(spoken.filter((id) => id === 'place_object').length, 18);
+  assert.equal(spoken.filter((id) => id === 'add_object').length, 9);
+  assert.equal(spoken.filter((id) => id === 'judge_object').length, 9);
   assert.equal(downloads.length, 1);
   const exported = JSON.parse(await downloads[0].blob.text());
   assert.equal(exported.schema, 'vr_blicket_task.web_session.v2');

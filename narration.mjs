@@ -27,7 +27,7 @@ export function createNarration(inventory, onSpeaking = () => {}) {
       return;
     }
     const file = cues.get(id).files[language];
-    const clip = new Audio(new URL(`./audio/${file}?v=20260928i`, import.meta.url));
+    const clip = new Audio(new URL(`./audio/${file}?v=20260929b`, import.meta.url));
     audio = clip;
     clip.volume = 0.9;
     const finished = () => {
